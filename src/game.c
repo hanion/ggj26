@@ -55,9 +55,14 @@ static bool playerGunAnimLoaded;
 static PlayerAnimState playerAnimState;
 static PlayerGunAnimState playerGunAnimState;
 static const float playerSpriteScale = 0.2f;
-static const Vector2 playerSpritePivot = {0.5f, 0.6f};
+static const Vector2 playerSpritePivot = {0.5f, 0.5f};
 static const float playerGunShootHold = 0.2f;
 static float playerGunShootTimer = 0.0f;
+static const float meleeRange = 80.0f;
+static const float meleePromptOffset = 25.0f;
+static const float playerDebugCrossSize = 6.0f;
+static const bool playerDebugDraw = false;
+static int meleeTargetIndex = -1;
 
 static void DrawPlayerFallback(Vector2 position, float radius) {
     float size = radius * 2.0f;
@@ -73,6 +78,51 @@ static void DrawPlayerFrame(Texture2D frame, Vector2 position, float rotation) {
                       frame.width * playerSpriteScale,
                       frame.height * playerSpriteScale};
     DrawTexturePro(frame, source, dest, origin, rotation, WHITE);
+}
+
+static void DrawPlayerShadow(Texture2D shadow, Vector2 position) {
+    Rectangle source = {0.0f, 0.0f, (float)shadow.width, (float)shadow.height};
+    Vector2 origin = {shadow.width * playerSpriteScale * playerSpritePivot.x,
+                      shadow.height * playerSpriteScale * playerSpritePivot.y};
+    Rectangle dest = {position.x - origin.x, position.y - origin.y,
+                      shadow.width * playerSpriteScale,
+                      shadow.height * playerSpriteScale};
+    DrawTexturePro(shadow, source, dest, origin, 0.0f, WHITE);
+}
+
+static int GetClosestEnemyInRange(Vector2 position, float range) {
+    float closestDist = range;
+    int closestIndex = -1;
+    for (int i = 0; i < currentLevel.enemyCount; i++) {
+        if (!currentLevel.enemies[i].active) {
+            continue;
+        }
+        float dist = Vector2Distance(position, currentLevel.enemies[i].position);
+        if (dist <= closestDist) {
+            closestDist = dist;
+            closestIndex = i;
+        }
+    }
+    return closestIndex;
+}
+
+static void HandleEnemyKilled(int enemyIndex) {
+    if (enemyIndex < 0 || enemyIndex >= currentLevel.enemyCount) {
+        return;
+    }
+    if (!currentLevel.enemies[enemyIndex].active) {
+        return;
+    }
+    currentLevel.enemies[enemyIndex].active = false;
+    maskActive = true;
+    droppedMask.identity = currentLevel.enemies[enemyIndex].identity;
+    droppedMask.position = currentLevel.enemies[enemyIndex].position;
+    droppedMask.radius = 15.0f;
+    droppedMask.active = true;
+    if (player.equipmentState == PLAYER_EQUIP_BARE_HANDS) {
+        player.equipmentState = PLAYER_EQUIP_GUN;
+        TraceLog(LOG_INFO, "Player granted gun after first kill");
+    }
 }
 
 void Game_Init(void) {
@@ -214,6 +264,15 @@ void Game_Update(void) {
         }
     }
 
+    meleeTargetIndex = -1;
+    if (player.equipmentState == PLAYER_EQUIP_BARE_HANDS) {
+        meleeTargetIndex = GetClosestEnemyInRange(player.position, meleeRange);
+        if (meleeTargetIndex != -1 && IsKeyPressed(KEY_E)) {
+            HandleEnemyKilled(meleeTargetIndex);
+            meleeTargetIndex = -1;
+        }
+    }
+
     // Enemy Update
     for (int i = 0; i < currentLevel.enemyCount; i++) {
         UpdateEnemy(&currentLevel.enemies[i], player.position, bullets, MAX_BULLETS, dt);
@@ -240,18 +299,8 @@ void Game_Update(void) {
                 if (currentLevel.enemies[e].active &&
                     CheckCollisionCircles(bullets[i].position, bullets[i].radius,
                                           currentLevel.enemies[e].position, currentLevel.enemies[e].radius)) {
-                    currentLevel.enemies[e].active = false;
                     bullets[i].active = false;
-                    // Drop Mask Logic
-                    maskActive = true;
-                    droppedMask.identity = currentLevel.enemies[e].identity;
-                    droppedMask.position = currentLevel.enemies[e].position;
-                    droppedMask.radius = 15.0f;
-                    droppedMask.active = true;
-                    if (player.equipmentState == PLAYER_EQUIP_BARE_HANDS) {
-                        player.equipmentState = PLAYER_EQUIP_GUN;
-                        TraceLog(LOG_INFO, "Player granted gun after first kill");
-                    }
+                    HandleEnemyKilled(e);
                 }
             }
         } else {
@@ -364,11 +413,7 @@ void Game_Draw(void) {
                 }
             }
             if (playerShadow.id != 0 && frame.id != 0) {
-                Vector2 shadowPos = {
-                    player.position.x - (playerShadow.width * playerSpriteScale) / 2.0f,
-                    player.position.y - (playerShadow.height * playerSpriteScale) / 2.0f + player.radius * 0.3f
-                };
-                DrawTextureEx(playerShadow, shadowPos, 0.0f, playerSpriteScale, WHITE);
+                DrawPlayerShadow(playerShadow, player.position);
             }
             if (frame.id != 0) {
                 DrawPlayerFrame(frame, player.position, player.rotation);
@@ -377,6 +422,19 @@ void Game_Draw(void) {
             }
         } else {
             DrawPlayerFallback(player.position, player.radius);
+        }
+        if (meleeTargetIndex != -1) {
+            Vector2 promptPos = {
+                currentLevel.enemies[meleeTargetIndex].position.x - 40.0f,
+                currentLevel.enemies[meleeTargetIndex].position.y - meleePromptOffset
+            };
+            DrawText("PRESS E TO CHOKE", (int)promptPos.x, (int)promptPos.y, 12, WHITE);
+        }
+        if (playerDebugDraw) {
+            DrawLineV((Vector2){player.position.x - playerDebugCrossSize, player.position.y},
+                      (Vector2){player.position.x + playerDebugCrossSize, player.position.y}, RED);
+            DrawLineV((Vector2){player.position.x, player.position.y - playerDebugCrossSize},
+                      (Vector2){player.position.x, player.position.y + playerDebugCrossSize}, RED);
         }
         Vector2 mouseWorld = GetScreenToWorld2D(GetMousePosition(), camera);
         DrawLineV(player.position, mouseWorld, Fade(WHITE, 0.2f));
