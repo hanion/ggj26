@@ -112,6 +112,12 @@ void Game_Update(void) {
                 bullets[i].active = false;
             }
         }
+        // Check Door Collisions
+        for (int d = 0; d < currentLevel.doorCount; d++) {
+            if (CheckCollisionCircleRec(bullets[i].position, bullets[i].radius, currentLevel.doors[d])) {
+                bullets[i].active = false;
+            }
+        }
         if (!bullets[i].active) continue;
 
         if (bullets[i].isPlayerOwned) {
