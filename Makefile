@@ -2,4 +2,4 @@
 all: ggj26
 
 ggj26: src/main.c
-	cc -o ggj26 src/main.c -L./raylib/src/libraylib.so -lraylib -lm
+	gcc -o ggj26 -I./raylib/src src/main.c -L./raylib/src -lraylib -lopengl32 -lgdi32 -lwinmm

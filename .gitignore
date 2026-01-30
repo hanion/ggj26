@@ -1,3 +1,9 @@
 ggj26
 build/
 bin/
+raylib/
+Makefile
+.gitignore
+.vscode/
+path.txt
+ggj26.exe
