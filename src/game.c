@@ -60,6 +60,8 @@ static const float playerGunShootHold = 0.2f;
 static float playerGunShootTimer = 0.0f;
 static const float meleeRange = 80.0f;
 static const float meleePromptOffset = 25.0f;
+static const float meleePromptHorizontalOffset = 40.0f;
+static const float droppedMaskRadius = 15.0f;
 static const float playerDebugCrossSize = 6.0f;
 static const bool playerDebugDraw = false;
 static int meleeTargetIndex = -1;
@@ -117,7 +119,7 @@ static void HandleEnemyKilled(int enemyIndex) {
     maskActive = true;
     droppedMask.identity = currentLevel.enemies[enemyIndex].identity;
     droppedMask.position = currentLevel.enemies[enemyIndex].position;
-    droppedMask.radius = 15.0f;
+    droppedMask.radius = droppedMaskRadius;
     droppedMask.active = true;
     if (player.equipmentState == PLAYER_EQUIP_BARE_HANDS) {
         player.equipmentState = PLAYER_EQUIP_GUN;
@@ -423,9 +425,10 @@ void Game_Draw(void) {
         } else {
             DrawPlayerFallback(player.position, player.radius);
         }
-        if (meleeTargetIndex != -1) {
+        if (meleeTargetIndex >= 0 && meleeTargetIndex < currentLevel.enemyCount &&
+            currentLevel.enemies[meleeTargetIndex].active) {
             Vector2 promptPos = {
-                currentLevel.enemies[meleeTargetIndex].position.x - 40.0f,
+                currentLevel.enemies[meleeTargetIndex].position.x - meleePromptHorizontalOffset,
                 currentLevel.enemies[meleeTargetIndex].position.y - meleePromptOffset
             };
             DrawText("PRESS E TO CHOKE", (int)promptPos.x, (int)promptPos.y, 12, WHITE);
