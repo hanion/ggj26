@@ -1,5 +1,14 @@
-.PHONY: all
+CC = cc
+CFLAGS = -I./raylib/src
+LDFLAGS = -L./raylib/src -lraylib -lm -ldl -lpthread -lX11
+
+.PHONY: all clean
+
 all: ggj26
 
-ggj26: src/main.c src/game.c src/levels.c src/episodes/episode1.c src/player.c src/enemies/enemy1.c
-	gcc -o ggj26 -Isrc -I./raylib/src src/main.c src/game.c src/levels.c src/episodes/episode1.c src/player.c src/enemies/enemy1.c -L./raylib/src -lraylib -lopengl32 -lgdi32 -lwinmm
+ggj26: src/main.c
+	$(CC) -o $@ $< $(CFLAGS) $(LDFLAGS)
+
+clean:
+	rm -f ggj26
+
