@@ -82,8 +82,21 @@ void Game_Init(void) {
     btnQuit     = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 140, (float)btnWidth, (float)btnHeight };
 }
 
-static void UpdateMenu(void) {
+// Helper for HighDPI Mouse Scaling
+static Vector2 GetScaledMousePosition(void) {
     Vector2 mousePos = GetMousePosition();
+    float scaleX = (float)GetScreenWidth() / (float)GetRenderWidth();
+    float scaleY = (float)GetScreenHeight() / (float)GetRenderHeight();
+
+    if (GetScreenWidth() > 0 && GetRenderWidth() > 0) {
+        mousePos.x *= scaleX;
+        mousePos.y *= scaleY;
+    }
+    return mousePos;
+}
+
+static void UpdateMenu(void) {
+    Vector2 mousePos = GetScaledMousePosition();
 
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         if (CheckCollisionPointRec(mousePos, btnEpisode1)) {
@@ -91,7 +104,7 @@ static void UpdateMenu(void) {
         } else if (CheckCollisionPointRec(mousePos, btnEpisode2)) {
             StartLevel(2);
         } else if (CheckCollisionPointRec(mousePos, btnQuit)) {
-            CloseWindow(); // Basic quit
+            CloseWindow();
         }
     }
 }
@@ -108,7 +121,7 @@ static void DrawMenu(void) {
     // Buttons
     Color hoverColor = (Color){50, 50, 60, 255};
     Color normalColor = GRAY;
-    Vector2 mousePos = GetMousePosition();
+    Vector2 mousePos = GetScaledMousePosition();
 
     // Episode 1
     DrawRectangleRec(btnEpisode1, CheckCollisionPointRec(mousePos, btnEpisode1) ? hoverColor : normalColor);
@@ -121,7 +134,7 @@ static void DrawMenu(void) {
     // Quit
     DrawRectangleRec(btnQuit, CheckCollisionPointRec(mousePos, btnQuit) ? hoverColor : normalColor);
     DrawText("QUIT", btnQuit.x + 75, btnQuit.y + 15, 20, WHITE);
-
+    
     EndDrawing();
 }
 
