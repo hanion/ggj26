@@ -111,9 +111,9 @@ static void UpdatePlayerPivotFromFrame(Texture2D frame) {
     }
     unsigned char *pixels = (unsigned char *)image.data;
     int minX = image.width;
-    int maxX = 0;
+    int maxX = -1;
     int minY = image.height;
-    int maxY = 0;
+    int maxY = -1;
     bool found = false;
 
     for (int y = 0; y < image.height; y++) {
