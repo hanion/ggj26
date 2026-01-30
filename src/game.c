@@ -65,6 +65,8 @@ static const float droppedMaskRadius = 15.0f;
 static const float playerDebugCrossSize = 6.0f;
 static const bool playerDebugDraw = false;
 static int meleeTargetIndex = -1;
+static Vector2 playerFramePivot = {0.5f, 0.5f};
+static bool playerFramePivotReady = false;
 
 static void DrawPlayerFallback(Vector2 position, float radius) {
     float size = radius * 2.0f;
@@ -74,8 +76,9 @@ static void DrawPlayerFallback(Vector2 position, float radius) {
 
 static void DrawPlayerFrame(Texture2D frame, Vector2 position, float rotation) {
     Rectangle source = {0.0f, 0.0f, (float)frame.width, (float)frame.height};
-    Vector2 origin = {frame.width * playerSpriteScale * playerSpritePivot.x,
-                      frame.height * playerSpriteScale * playerSpritePivot.y};
+    Vector2 pivot = playerFramePivotReady ? playerFramePivot : playerSpritePivot;
+    Vector2 origin = {frame.width * playerSpriteScale * pivot.x,
+                      frame.height * playerSpriteScale * pivot.y};
     Rectangle dest = {position.x - origin.x, position.y - origin.y,
                       frame.width * playerSpriteScale,
                       frame.height * playerSpriteScale};
@@ -84,12 +87,52 @@ static void DrawPlayerFrame(Texture2D frame, Vector2 position, float rotation) {
 
 static void DrawPlayerShadow(Texture2D shadow, Vector2 position) {
     Rectangle source = {0.0f, 0.0f, (float)shadow.width, (float)shadow.height};
-    Vector2 origin = {shadow.width * playerSpriteScale * playerSpritePivot.x,
-                      shadow.height * playerSpriteScale * playerSpritePivot.y};
+    Vector2 pivot = playerFramePivotReady ? playerFramePivot : playerSpritePivot;
+    Vector2 origin = {shadow.width * playerSpriteScale * pivot.x,
+                      shadow.height * playerSpriteScale * pivot.y};
     Rectangle dest = {position.x - origin.x, position.y - origin.y,
                       shadow.width * playerSpriteScale,
                       shadow.height * playerSpriteScale};
     DrawTexturePro(shadow, source, dest, origin, 0.0f, WHITE);
+}
+
+static void UpdatePlayerPivotFromFrame(Texture2D frame) {
+    if (playerFramePivotReady || frame.id == 0) {
+        return;
+    }
+    Image image = LoadImageFromTexture(frame);
+    if (image.data == NULL) {
+        return;
+    }
+    unsigned char *pixels = (unsigned char *)image.data;
+    int minX = image.width;
+    int maxX = 0;
+    int minY = image.height;
+    int maxY = 0;
+    bool found = false;
+
+    for (int y = 0; y < image.height; y++) {
+        for (int x = 0; x < image.width; x++) {
+            int index = (y * image.width + x) * 4 + 3;
+            unsigned char alpha = pixels[index];
+            if (alpha > 0) {
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+                found = true;
+            }
+        }
+    }
+
+    if (found) {
+        float centerX = (minX + maxX) * 0.5f;
+        float centerY = (minY + maxY) * 0.5f;
+        playerFramePivot = (Vector2){centerX / (float)image.width,
+                                     centerY / (float)image.height};
+        playerFramePivotReady = true;
+    }
+    UnloadImage(image);
 }
 
 static int GetClosestEnemyInRange(Vector2 position, float range) {
@@ -185,6 +228,7 @@ void Game_Init(void) {
     if (playerGunAnimLoaded) {
         AnimPlayer_SetClip(&playerGunAnim, &playerGunIdleClip);
     }
+    playerFramePivotReady = false;
     if (!playerAnimLoaded) {
         TraceLog(LOG_ERROR, "Player animation assets missing, using fallback");
     }
@@ -418,6 +462,7 @@ void Game_Draw(void) {
                 DrawPlayerShadow(playerShadow, player.position);
             }
             if (frame.id != 0) {
+                UpdatePlayerPivotFromFrame(frame);
                 DrawPlayerFrame(frame, player.position, player.rotation);
             } else {
                 DrawPlayerFallback(player.position, player.radius);
@@ -438,6 +483,7 @@ void Game_Draw(void) {
                       (Vector2){player.position.x + playerDebugCrossSize, player.position.y}, RED);
             DrawLineV((Vector2){player.position.x, player.position.y - playerDebugCrossSize},
                       (Vector2){player.position.x, player.position.y + playerDebugCrossSize}, RED);
+            DrawCircleLines((int)player.position.x, (int)player.position.y, player.radius, GOLD);
         }
         Vector2 mouseWorld = GetScreenToWorld2D(GetMousePosition(), camera);
         DrawLineV(player.position, mouseWorld, Fade(WHITE, 0.2f));
