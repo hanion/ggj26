@@ -5,6 +5,7 @@
 
 #include "../raylib/src/raylib.h"
 #include "../raylib/src/raymath.h"
+#include "anim.h"
 #include "enemies/enemy.h"
 #include "entity.h"
 #include "episodes/episodes.h"
@@ -30,6 +31,25 @@ static Bullet bullets[MAX_BULLETS];
 static Entity droppedMask;
 static bool maskActive;
 
+typedef enum {
+    PLAYER_ANIM_IDLE,
+    PLAYER_ANIM_WALK
+} PlayerAnimState;
+
+static AnimClip playerIdleClip;
+static AnimClip playerWalkClip;
+static AnimPlayer playerAnim;
+static Texture2D playerShadow;
+static bool playerAnimLoaded;
+static PlayerAnimState playerAnimState;
+static const float playerSpriteScale = 0.2f;
+
+static void DrawPlayerFallback(Vector2 position, float radius) {
+    float size = radius * 2.0f;
+    DrawRectangleV((Vector2){position.x - radius, position.y - radius},
+                   (Vector2){size, size}, RED);
+}
+
 void Game_Init(void) {
     gameOver = false;
     gameWon = false;
@@ -50,6 +70,29 @@ void Game_Init(void) {
     camera.offset = (Vector2){ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f };
     camera.rotation = 0.0f;
     camera.zoom = 1.0f;
+
+    if (!playerAnimLoaded) {
+        UnloadAnimClip(&playerIdleClip);
+        UnloadAnimClip(&playerWalkClip);
+        if (playerShadow.id != 0) {
+            UnloadTexture(playerShadow);
+            playerShadow = (Texture2D){0};
+        }
+        playerIdleClip = LoadAnimClip("assets/character/LightArtilleryRobot/idle60", 30.0f);
+        playerWalkClip = LoadAnimClip("assets/character/LightArtilleryRobot/walk60", 60.0f);
+        playerShadow = LoadTexture("assets/character/LightArtilleryRobot/shadow.png");
+        playerAnimLoaded = playerIdleClip.frame_count > 0 && playerWalkClip.frame_count > 0 &&
+                           playerShadow.id != 0;
+        playerAnim = (AnimPlayer){0};
+        playerAnimState = PLAYER_ANIM_IDLE;
+        AnimPlayer_SetClip(&playerAnim, &playerIdleClip);
+        if (!playerAnimLoaded) {
+            TraceLog(LOG_ERROR, "Player animation assets missing, using fallback");
+        }
+    } else {
+        playerAnimState = PLAYER_ANIM_IDLE;
+        AnimPlayer_SetClip(&playerAnim, &playerIdleClip);
+    }
 }
 
 void Game_Update(void) {
@@ -68,6 +111,14 @@ void Game_Update(void) {
 
     // Player Update
     UpdatePlayer(&player, &currentLevel, dt);
+    PlayerAnimState nextState =
+        Vector2Length(player.velocity) > 0.01f ? PLAYER_ANIM_WALK : PLAYER_ANIM_IDLE;
+    if (nextState != playerAnimState) {
+        playerAnimState = nextState;
+        AnimPlayer_SetClip(&playerAnim,
+                           playerAnimState == PLAYER_ANIM_WALK ? &playerWalkClip : &playerIdleClip);
+    }
+    AnimPlayer_Update(&playerAnim, dt);
 
     // Camera Update
     camera.target = Vector2Lerp(camera.target, player.position, 0.1f);
@@ -231,7 +282,27 @@ void Game_Draw(void) {
             }
         }
 
-        DrawCircleV(player.position, player.radius, player.identity.color);
+        if (playerAnimLoaded) {
+            Texture2D frame = AnimPlayer_GetFrame(&playerAnim);
+            if (playerShadow.id != 0 && frame.id != 0) {
+                Vector2 shadowPos = {
+                    player.position.x - (playerShadow.width * playerSpriteScale) / 2.0f,
+                    player.position.y - (playerShadow.height * playerSpriteScale) / 2.0f
+                };
+                DrawTextureEx(playerShadow, shadowPos, 0.0f, playerSpriteScale, WHITE);
+            }
+            if (frame.id != 0) {
+                Vector2 framePos = {
+                    player.position.x - (frame.width * playerSpriteScale) / 2.0f,
+                    player.position.y - (frame.height * playerSpriteScale) / 2.0f
+                };
+                DrawTextureEx(frame, framePos, 0.0f, playerSpriteScale, WHITE);
+            } else {
+                DrawPlayerFallback(player.position, player.radius);
+            }
+        } else {
+            DrawPlayerFallback(player.position, player.radius);
+        }
         Vector2 mouseWorld = GetScreenToWorld2D(GetMousePosition(), camera);
         DrawLineV(player.position, mouseWorld, Fade(WHITE, 0.2f));
         EndMode2D();
@@ -239,6 +310,7 @@ void Game_Draw(void) {
         // HUD
         DrawText(TextFormat("CURRENT LEVEL: %d", player.identity.permissionLevel),
                  20, 20, 20, WHITE);
+        DrawText(playerAnimState == PLAYER_ANIM_WALK ? "WALK" : "IDLE", 20, 45, 16, WHITE);
 
         if (gameWon) {
             int sw = GetScreenWidth();
@@ -250,5 +322,11 @@ void Game_Draw(void) {
 }
 
 void Game_Shutdown(void) {
-    // Cleanup if needed
+    UnloadAnimClip(&playerIdleClip);
+    UnloadAnimClip(&playerWalkClip);
+    if (playerShadow.id != 0) {
+        UnloadTexture(playerShadow);
+        playerShadow = (Texture2D){0};
+    }
+    playerAnimLoaded = false;
 }
