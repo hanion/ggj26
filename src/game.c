@@ -67,6 +67,7 @@ static const bool playerDebugDraw = false;
 static int meleeTargetIndex = -1;
 static Vector2 playerFramePivot = {0.5f, 0.5f};
 static bool playerFramePivotReady = false;
+static const unsigned char playerPivotAlphaThreshold = 32;
 
 static void DrawPlayerFallback(Vector2 position, float radius) {
     float size = radius * 2.0f;
@@ -102,7 +103,11 @@ static void UpdatePlayerPivotFromFrame(Texture2D frame) {
     }
     Image image = LoadImageFromTexture(frame);
     if (image.data == NULL) {
+        TraceLog(LOG_WARNING, "Failed to read player frame for pivot");
         return;
+    }
+    if (image.format != PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) {
+        ImageFormat(&image, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
     }
     unsigned char *pixels = (unsigned char *)image.data;
     int minX = image.width;
@@ -115,7 +120,7 @@ static void UpdatePlayerPivotFromFrame(Texture2D frame) {
         for (int x = 0; x < image.width; x++) {
             int index = (y * image.width + x) * 4 + 3;
             unsigned char alpha = pixels[index];
-            if (alpha > 0) {
+            if (alpha > playerPivotAlphaThreshold) {
                 if (x < minX) minX = x;
                 if (x > maxX) maxX = x;
                 if (y < minY) minY = y;
@@ -131,6 +136,8 @@ static void UpdatePlayerPivotFromFrame(Texture2D frame) {
         playerFramePivot = (Vector2){centerX / (float)image.width,
                                      centerY / (float)image.height};
         playerFramePivotReady = true;
+    } else {
+        TraceLog(LOG_WARNING, "Player frame had no opaque pixels for pivot");
     }
     UnloadImage(image);
 }
@@ -229,6 +236,9 @@ void Game_Init(void) {
         AnimPlayer_SetClip(&playerGunAnim, &playerGunIdleClip);
     }
     playerFramePivotReady = false;
+    if (playerAnimLoaded) {
+        UpdatePlayerPivotFromFrame(AnimPlayer_GetFrame(&playerAnim));
+    }
     if (!playerAnimLoaded) {
         TraceLog(LOG_ERROR, "Player animation assets missing, using fallback");
     }
@@ -462,7 +472,6 @@ void Game_Draw(void) {
                 DrawPlayerShadow(playerShadow, player.position);
             }
             if (frame.id != 0) {
-                UpdatePlayerPivotFromFrame(frame);
                 DrawPlayerFrame(frame, player.position, player.rotation);
             } else {
                 DrawPlayerFallback(player.position, player.radius);
