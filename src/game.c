@@ -36,18 +36,48 @@ typedef enum {
     PLAYER_ANIM_WALK
 } PlayerAnimState;
 
+typedef enum {
+    PLAYER_EQUIP_BARE_HANDS,
+    PLAYER_EQUIP_GUN
+} PlayerEquipState;
+
+typedef enum {
+    PLAYER_GUN_IDLE,
+    PLAYER_GUN_WALK,
+    PLAYER_GUN_SHOOT
+} PlayerGunAnimState;
+
 static AnimClip playerIdleClip;
 static AnimClip playerWalkClip;
+static AnimClip playerGunIdleClip;
+static AnimClip playerGunWalkClip;
+static AnimClip playerGunShootClip;
 static AnimPlayer playerAnim;
+static AnimPlayer playerGunAnim;
 static Texture2D playerShadow;
 static bool playerAnimLoaded;
+static bool playerGunAnimLoaded;
 static PlayerAnimState playerAnimState;
+static PlayerGunAnimState playerGunAnimState;
 static const float playerSpriteScale = 0.2f;
+static const Vector2 playerSpritePivot = {0.5f, 0.6f};
+static const float playerGunShootHold = 0.2f;
+static float playerGunShootTimer = 0.0f;
 
 static void DrawPlayerFallback(Vector2 position, float radius) {
     float size = radius * 2.0f;
     DrawRectangleV((Vector2){position.x - radius, position.y - radius},
                    (Vector2){size, size}, RED);
+}
+
+static void DrawPlayerFrame(Texture2D frame, Vector2 position, float rotation) {
+    Rectangle source = {0.0f, 0.0f, (float)frame.width, (float)frame.height};
+    Rectangle dest = {position.x, position.y,
+                      frame.width * playerSpriteScale,
+                      frame.height * playerSpriteScale};
+    Vector2 origin = {frame.width * playerSpriteScale * playerSpritePivot.x,
+                      frame.height * playerSpriteScale * playerSpritePivot.y};
+    DrawTexturePro(frame, source, dest, origin, rotation, WHITE);
 }
 
 void Game_Init(void) {
@@ -63,6 +93,10 @@ void Game_Init(void) {
 
     // Player
     player = InitPlayer(currentLevel.playerSpawn, currentLevel.playerStartId);
+    player.equipmentState = PLAYER_EQUIP_BARE_HANDS;
+    player.hasGun = false;
+    player.aimAngle = 0.0f;
+    playerGunShootTimer = 0.0f;
 
     // Camera
     camera = (Camera2D){0};
@@ -74,19 +108,33 @@ void Game_Init(void) {
     if (playerAnimLoaded) {
         UnloadAnimClip(&playerIdleClip);
         UnloadAnimClip(&playerWalkClip);
+        UnloadAnimClip(&playerGunIdleClip);
+        UnloadAnimClip(&playerGunWalkClip);
+        UnloadAnimClip(&playerGunShootClip);
         if (playerShadow.id != 0) {
             UnloadTexture(playerShadow);
             playerShadow = (Texture2D){0};
         }
+        playerAnimLoaded = false;
+        playerGunAnimLoaded = false;
     }
     playerIdleClip = LoadAnimClip("assets/character/LightArtilleryRobot/idle60", 30.0f);
     playerWalkClip = LoadAnimClip("assets/character/LightArtilleryRobot/walk60", 60.0f);
+    playerGunIdleClip = LoadAnimClip("assets/character/LightArtilleryRobot/takeAimGun40", 30.0f);
+    playerGunWalkClip = LoadAnimClip("assets/character/LightArtilleryRobot/takeAimGun40", 60.0f);
+    playerGunShootClip = LoadAnimClip("assets/character/LightArtilleryRobot/shootGun20", 60.0f);
     playerShadow = LoadTexture("assets/character/LightArtilleryRobot/shadow.png");
     playerAnimLoaded = playerIdleClip.frame_count > 0 && playerWalkClip.frame_count > 0 &&
                        playerShadow.id != 0;
+    playerGunAnimLoaded = playerGunIdleClip.frame_count > 0 &&
+                          playerGunWalkClip.frame_count > 0 &&
+                          playerGunShootClip.frame_count > 0;
     playerAnim = (AnimPlayer){0};
+    playerGunAnim = (AnimPlayer){0};
     playerAnimState = PLAYER_ANIM_IDLE;
+    playerGunAnimState = PLAYER_GUN_IDLE;
     AnimPlayer_SetClip(&playerAnim, &playerIdleClip);
+    AnimPlayer_SetClip(&playerGunAnim, &playerGunIdleClip);
     if (!playerAnimLoaded) {
         TraceLog(LOG_ERROR, "Player animation assets missing, using fallback");
     }
@@ -123,11 +171,37 @@ void Game_Update(void) {
     // Player Aiming
     Vector2 mouseWorld = GetScreenToWorld2D(GetMousePosition(), camera);
     Vector2 aimDir = Vector2Subtract(mouseWorld, player.position);
-    player.rotation = atan2f(aimDir.y, aimDir.x) * RAD2DEG;
+    Vector2 aimDirNormalized =
+        Vector2Length(aimDir) > 0.01f ? Vector2Normalize(aimDir) : (Vector2){1.0f, 0.0f};
+    player.aimAngle = atan2f(aimDirNormalized.y, aimDirNormalized.x);
+    player.rotation = player.aimAngle * RAD2DEG;
+    if (playerGunShootTimer > 0.0f) {
+        playerGunShootTimer -= dt;
+        if (playerGunShootTimer < 0.0f) {
+            playerGunShootTimer = 0.0f;
+        }
+    }
+
+    if (player.equipmentState == PLAYER_EQUIP_GUN && playerGunAnimLoaded) {
+        PlayerGunAnimState gunNextState = PLAYER_GUN_IDLE;
+        if (playerGunShootTimer > 0.0f) {
+            gunNextState = PLAYER_GUN_SHOOT;
+        } else if (Vector2Length(player.velocity) > 0.01f) {
+            gunNextState = PLAYER_GUN_WALK;
+        }
+        if (gunNextState != playerGunAnimState) {
+            playerGunAnimState = gunNextState;
+            AnimPlayer_SetClip(&playerGunAnim,
+                               playerGunAnimState == PLAYER_GUN_SHOOT ? &playerGunShootClip :
+                               playerGunAnimState == PLAYER_GUN_WALK ? &playerGunWalkClip :
+                                                                       &playerGunIdleClip);
+        }
+        AnimPlayer_Update(&playerGunAnim, dt);
+    }
 
     // Player Shooting
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-        if (HasAbility(player.identity, ABILITY_SHOOT)) {
+        if (player.equipmentState == PLAYER_EQUIP_GUN && HasAbility(player.identity, ABILITY_SHOOT)) {
             for (int i = 0; i < MAX_BULLETS; i++) {
                 if (!bullets[i].active) {
                     bullets[i].active = true;
@@ -135,7 +209,8 @@ void Game_Update(void) {
                     bullets[i].radius = BULLET_RADIUS;
                     bullets[i].lifeTime = BULLET_LIFETIME;
                     bullets[i].isPlayerOwned = true;
-                    bullets[i].velocity = Vector2Scale(Vector2Normalize(aimDir), BULLET_SPEED);
+                    bullets[i].velocity = Vector2Scale(aimDirNormalized, BULLET_SPEED);
+                    playerGunShootTimer = playerGunShootHold;
                     break;
                 }
             }
@@ -176,6 +251,11 @@ void Game_Update(void) {
                     droppedMask.position = currentLevel.enemies[e].position;
                     droppedMask.radius = 15.0f;
                     droppedMask.active = true;
+                    if (player.equipmentState == PLAYER_EQUIP_BARE_HANDS) {
+                        player.equipmentState = PLAYER_EQUIP_GUN;
+                        player.hasGun = true;
+                        TraceLog(LOG_INFO, "Player picked up gun");
+                    }
                 }
             }
         } else {
@@ -281,6 +361,12 @@ void Game_Draw(void) {
 
         if (playerAnimLoaded) {
             Texture2D frame = AnimPlayer_GetFrame(&playerAnim);
+            if (player.equipmentState == PLAYER_EQUIP_GUN && playerGunAnimLoaded) {
+                Texture2D gunFrame = AnimPlayer_GetFrame(&playerGunAnim);
+                if (gunFrame.id != 0) {
+                    frame = gunFrame;
+                }
+            }
             if (playerShadow.id != 0 && frame.id != 0) {
                 Vector2 shadowPos = {
                     player.position.x - (playerShadow.width * playerSpriteScale) / 2.0f,
@@ -289,11 +375,7 @@ void Game_Draw(void) {
                 DrawTextureEx(playerShadow, shadowPos, 0.0f, playerSpriteScale, WHITE);
             }
             if (frame.id != 0) {
-                Vector2 framePos = {
-                    player.position.x - (frame.width * playerSpriteScale) / 2.0f,
-                    player.position.y - (frame.height * playerSpriteScale) / 2.0f
-                };
-                DrawTextureEx(frame, framePos, 0.0f, playerSpriteScale, WHITE);
+                DrawPlayerFrame(frame, player.position, player.rotation);
             } else {
                 DrawPlayerFallback(player.position, player.radius);
             }
@@ -307,6 +389,8 @@ void Game_Draw(void) {
         // HUD
         DrawText(TextFormat("CURRENT LEVEL: %d", player.identity.permissionLevel),
                  20, 20, 20, WHITE);
+        DrawText(player.equipmentState == PLAYER_EQUIP_GUN ? "EQUIP: GUN" : "EQUIP: HANDS",
+                 20, 45, 16, WHITE);
 
         if (gameWon) {
             int sw = GetScreenWidth();
@@ -320,9 +404,13 @@ void Game_Draw(void) {
 void Game_Shutdown(void) {
     UnloadAnimClip(&playerIdleClip);
     UnloadAnimClip(&playerWalkClip);
+    UnloadAnimClip(&playerGunIdleClip);
+    UnloadAnimClip(&playerGunWalkClip);
+    UnloadAnimClip(&playerGunShootClip);
     if (playerShadow.id != 0) {
         UnloadTexture(playerShadow);
         playerShadow = (Texture2D){0};
     }
     playerAnimLoaded = false;
+    playerGunAnimLoaded = false;
 }

@@ -16,6 +16,10 @@ typedef struct {
   bool isPlayer;
   float radius;     // Collision size
   float shootTimer; // For AI cooldown
+
+  int equipmentState;
+  bool hasGun;
+  float aimAngle;
 } Entity;
 
 typedef struct {

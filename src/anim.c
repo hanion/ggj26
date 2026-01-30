@@ -71,6 +71,13 @@ AnimClip LoadAnimClip(const char *directory, float fps) {
         return clip;
     }
 
+    if (count < (int)capacity) {
+        char **shrunk = realloc(names, count * sizeof(char *));
+        if (shrunk) {
+            names = shrunk;
+        }
+    }
+
     qsort(names, count, sizeof(char *), CompareFrameNames);
 
     clip.frames = malloc(sizeof(Texture2D) * count);
