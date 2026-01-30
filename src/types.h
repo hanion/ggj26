@@ -27,4 +27,9 @@ typedef struct {
   float speed;   // Movement speed modifier (optional but good for gameplay)
 } Identity;
 
+// Quick helper for bitwise checks
+static inline bool HasAbility(Identity id, AbilityFlags flag) {
+  return (id.abilities & flag) != 0;
+}
+
 #endif // TYPES_H
