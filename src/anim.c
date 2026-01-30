@@ -82,12 +82,20 @@ AnimClip LoadAnimClip(const char *directory, float fps) {
     }
 
     for (int i = 0; i < count; i++) {
-        char path[512];
-        snprintf(path, sizeof(path), "%s/%s", directory, names[i]);
+        size_t pathLen = strlen(directory) + strlen(names[i]) + 2;
+        char *path = malloc(pathLen);
+        if (!path) {
+            TraceLog(LOG_ERROR, "Failed to allocate frame path");
+            clip.frames[i] = (Texture2D){0};
+            free(names[i]);
+            continue;
+        }
+        snprintf(path, pathLen, "%s/%s", directory, names[i]);
         clip.frames[i] = LoadTexture(path);
         if (clip.frames[i].id == 0) {
             TraceLog(LOG_ERROR, "Failed to load frame: %s", path);
         }
+        free(path);
         free(names[i]);
     }
 

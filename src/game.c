@@ -71,27 +71,24 @@ void Game_Init(void) {
     camera.rotation = 0.0f;
     camera.zoom = 1.0f;
 
-    if (!playerAnimLoaded) {
+    if (playerAnimLoaded) {
         UnloadAnimClip(&playerIdleClip);
         UnloadAnimClip(&playerWalkClip);
         if (playerShadow.id != 0) {
             UnloadTexture(playerShadow);
             playerShadow = (Texture2D){0};
         }
-        playerIdleClip = LoadAnimClip("assets/character/LightArtilleryRobot/idle60", 30.0f);
-        playerWalkClip = LoadAnimClip("assets/character/LightArtilleryRobot/walk60", 60.0f);
-        playerShadow = LoadTexture("assets/character/LightArtilleryRobot/shadow.png");
-        playerAnimLoaded = playerIdleClip.frame_count > 0 && playerWalkClip.frame_count > 0 &&
-                           playerShadow.id != 0;
-        playerAnim = (AnimPlayer){0};
-        playerAnimState = PLAYER_ANIM_IDLE;
-        AnimPlayer_SetClip(&playerAnim, &playerIdleClip);
-        if (!playerAnimLoaded) {
-            TraceLog(LOG_ERROR, "Player animation assets missing, using fallback");
-        }
-    } else {
-        playerAnimState = PLAYER_ANIM_IDLE;
-        AnimPlayer_SetClip(&playerAnim, &playerIdleClip);
+    }
+    playerIdleClip = LoadAnimClip("assets/character/LightArtilleryRobot/idle60", 30.0f);
+    playerWalkClip = LoadAnimClip("assets/character/LightArtilleryRobot/walk60", 60.0f);
+    playerShadow = LoadTexture("assets/character/LightArtilleryRobot/shadow.png");
+    playerAnimLoaded = playerIdleClip.frame_count > 0 && playerWalkClip.frame_count > 0 &&
+                       playerShadow.id != 0;
+    playerAnim = (AnimPlayer){0};
+    playerAnimState = PLAYER_ANIM_IDLE;
+    AnimPlayer_SetClip(&playerAnim, &playerIdleClip);
+    if (!playerAnimLoaded) {
+        TraceLog(LOG_ERROR, "Player animation assets missing, using fallback");
     }
 }
 
@@ -287,7 +284,7 @@ void Game_Draw(void) {
             if (playerShadow.id != 0 && frame.id != 0) {
                 Vector2 shadowPos = {
                     player.position.x - (playerShadow.width * playerSpriteScale) / 2.0f,
-                    player.position.y - (playerShadow.height * playerSpriteScale) / 2.0f
+                    player.position.y - (playerShadow.height * playerSpriteScale) / 2.0f + player.radius * 0.3f
                 };
                 DrawTextureEx(playerShadow, shadowPos, 0.0f, playerSpriteScale, WHITE);
             }
@@ -310,7 +307,6 @@ void Game_Draw(void) {
         // HUD
         DrawText(TextFormat("CURRENT LEVEL: %d", player.identity.permissionLevel),
                  20, 20, 20, WHITE);
-        DrawText(playerAnimState == PLAYER_ANIM_WALK ? "WALK" : "IDLE", 20, 45, 16, WHITE);
 
         if (gameWon) {
             int sw = GetScreenWidth();
