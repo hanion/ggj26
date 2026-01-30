@@ -1,15 +1,27 @@
-CC = cc
-CFLAGS = -I./raylib/src
-LDFLAGS = -L./raylib/src -lraylib -lm -ldl -lpthread -lX11
-SRCS = src/main.c src/game.c src/levels.c src/episodes/episode1.c src/player.c src/enemies/enemy1.c
+CC = gcc
 
-.PHONY: all clean
+# Common flags
+CFLAGS = -I./raylib/src -Isrc
+LDFLAGS = -L./raylib/src -lraylib
 
-all: ggj26
+ifeq ($(OS),Windows_NT)
+    # Windows
+    LIBS = -lopengl32 -lgdi32 -lwinmm
+else
+    UNAME_S := $(shell uname -s)
+    ifeq ($(UNAME_S), Darwin)
+        # macOS
+        LIBS = -framework CoreVideo -framework IOKit -framework Cocoa -framework GLUT -framework OpenGL
+    else
+        # Linux
+        LIBS = -lm -ldl -lpthread -lX11
+    endif
+endif
 
-ggj26: $(SRCS)
-	$(CC) -o $@ $(SRCS) $(CFLAGS) $(LDFLAGS)
+SRC = src/main.c src/game.c src/levels.c src/episodes/episode1.c src/player.c src/enemies/enemy1.c
+
+ggj26: $(SRC)
+	$(CC) -o ggj26 $(SRC) $(CFLAGS) $(LDFLAGS) $(LIBS)
 
 clean:
 	rm -f ggj26
-
