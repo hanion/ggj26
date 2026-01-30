@@ -2,7 +2,7 @@
 #include "game.h"
 
 int main(void) {
-  InitWindow(INITIAL_SCREEN_WIDTH, INITIAL_SCREEN_HEIGHT,
+  InitWindow(0, 0,
              "Identity Theft - Modular");
   SetTargetFPS(60);
   SetWindowState(FLAG_WINDOW_RESIZABLE);
