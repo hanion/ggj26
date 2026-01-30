@@ -1,4 +1,4 @@
-#include "../entity.h"
+#include "../enemies/enemy.h"
 #include "../types.h"
 #include "episodes.h"
 
@@ -8,27 +8,9 @@
 #define ENEMY_SHOOT_INTERVAL 2.0f
 
 void InitEpisode1(Level *level) {
-  // Identities
-  Identity idCivilian = {.permissionLevel = PERM_CIVILIAN,
-                         .abilities = ABILITY_SHOOT,
-                         .color = BLUE,
-                         .speed = 220.0f};
-  Identity idStaff = {.permissionLevel = PERM_STAFF,
-                      .abilities = ABILITY_SHOOT,
-                      .color = GREEN,
-                      .speed = 210.0f};
-  Identity idGuard = {.permissionLevel = PERM_GUARD,
-                      .abilities = ABILITY_SHOOT | ABILITY_PUNCH,
-                      .color = RED,
-                      .speed = 200.0f};
-  Identity idAdmin = {.permissionLevel = PERM_ADMIN,
-                      .abilities = ABILITY_SHOOT | ABILITY_PUNCH | ABILITY_DASH,
-                      .color = PURPLE,
-                      .speed = 250.0f};
-
   level->id = 1;
   level->playerSpawn = (Vector2){100.0f, 360.0f};
-  level->playerStartId = idCivilian;
+  level->playerStartId = GetIdentity(ENEMY_CIVILIAN);
   level->winX = 3100.0f;
 
   level->wallCount = 0;
@@ -59,23 +41,8 @@ void InitEpisode1(Level *level) {
   level->doorCount = 3;
 
   // Enemies
-  level->enemies[0] = (Entity){.position = {800, 360},
-                               .active = true,
-                               .isPlayer = false,
-                               .radius = 20,
-                               .identity = idStaff,
-                               .shootTimer = ENEMY_SHOOT_INTERVAL};
-  level->enemies[1] = (Entity){.position = {1800, 360},
-                               .active = true,
-                               .isPlayer = false,
-                               .radius = 20,
-                               .identity = idGuard,
-                               .shootTimer = ENEMY_SHOOT_INTERVAL};
-  level->enemies[2] = (Entity){.position = {2800, 360},
-                               .active = true,
-                               .isPlayer = false,
-                               .radius = 20,
-                               .identity = idAdmin,
-                               .shootTimer = ENEMY_SHOOT_INTERVAL};
+  level->enemies[0] = InitEnemy((Vector2){800, 360}, ENEMY_STAFF);
+  level->enemies[1] = InitEnemy((Vector2){1800, 360}, ENEMY_GUARD);
+  level->enemies[2] = InitEnemy((Vector2){2800, 360}, ENEMY_ADMIN);
   level->enemyCount = 3;
 }
