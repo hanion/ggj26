@@ -10,9 +10,11 @@
 #include "entity.h"
 #include "episodes/episodes.h"
 #include "levels.h"
-#include "player.h"
-#include "player_render.h"
+#include "player/player.h"
+#include "player/player_render.h"
 #include "types.h"
+
+#include "ui/hud.h"
 
 // Game Constants
 #define MAX_BULLETS 100
@@ -61,6 +63,8 @@ static const unsigned char playerPivotAlphaThreshold = 32;
 
 // Track equipment transitions for gameplay (rendering handles its own internal state).
 static PlayerEquipState lastEquipmentState;
+
+// HUD is implemented in ui/hud.c now.
 
 static void DrawPlayerFallback(Vector2 position, float radius) {
     float size = radius * 2.0f;
@@ -199,6 +203,8 @@ static void StartLevel(int episodeId) {
 
 void Game_Init(void) {
     currentState = STATE_MENU;
+
+    Hud_Init();
 
     // Define Menu Buttons (Centered)
     int sw = GetScreenWidth();
@@ -532,9 +538,8 @@ static void DrawGame(void) {
         }
 
         if (playerRender.loaded) {
-            // Draw muzzle flash behind the player (draw-order based).
-            PlayerRender_DrawMuzzleFlash(&playerRender, &player, weaponShootTimer);
             PlayerRender_Draw(&playerRender, &player);
+            PlayerRender_DrawMuzzleFlash(&playerRender, &player, weaponShootTimer);
         } else {
             DrawPlayerFallback(player.position, player.radius);
         }
@@ -557,30 +562,8 @@ static void DrawGame(void) {
         DrawLineV(player.position, mouseWorld, Fade(WHITE, 0.2f));
         EndMode2D();
 
-        // HUD
-        DrawText(TextFormat("CURRENT LEVEL: %d", player.identity.permissionLevel),
-                 20, 20, 20, WHITE);
-        const char *equipText = "EQUIP: HANDS";
-        switch (player.equipmentState) {
-            case PLAYER_EQUIP_KNIFE: equipText = "EQUIP: KNIFE"; break;
-            case PLAYER_EQUIP_FLASHLIGHT: equipText = "EQUIP: FLASHLIGHT"; break;
-            case PLAYER_EQUIP_HANDGUN: equipText = "EQUIP: HANDGUN"; break;
-            case PLAYER_EQUIP_RIFLE: equipText = "EQUIP: RIFLE"; break;
-            case PLAYER_EQUIP_SHOTGUN: equipText = "EQUIP: SHOTGUN"; break;
-            default: break;
-        }
-        DrawText(equipText, 20, 45, 16, WHITE);
-        
-        // Display ammo for guns
-        if (player.equipmentState == PLAYER_EQUIP_HANDGUN ||
-            player.equipmentState == PLAYER_EQUIP_RIFLE ||
-            player.equipmentState == PLAYER_EQUIP_SHOTGUN) {
-            const char *ammoText = TextFormat("AMMO: %d / %d", player.magAmmo, player.reserveAmmo);
-            DrawText(ammoText, 20, 65, 16, WHITE);
-            if (player.isReloading) {
-                DrawText("RELOADING...", 20, 85, 16, YELLOW);
-            }
-        }
+    // HUD
+    Hud_DrawPlayer(&player);
     }
 
     EndDrawing();
@@ -605,5 +588,6 @@ void Game_Draw(void) {
 
 void Game_Shutdown(void) {
     PlayerRender_Unload(&playerRender);
+    Hud_Shutdown();
 }
 
