@@ -15,8 +15,8 @@ int PlayerActions_GetClosestEnemyInRange(const Level *level, Vector2 position, f
 void PlayerActions_HandleEnemyKilled(Level *level,
                                     int enemyIndex,
                                     Entity *player,
-                                    Entity *droppedMask,
-                                    bool *maskWasActivated,
+                                    Entity *droppedMasks,
+                                    int maxMasks,
                                     float droppedMaskRadius);
 
 #endif // PLAYER_ACTIONS_H

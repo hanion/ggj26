@@ -79,8 +79,9 @@ bool CheckLineOfSight(Entity *enemy, Vector2 target, Level *level) {
 }
 
 // Helper for collision
-static void MoveEnemyWithCollision(Entity *enemy, Vector2 delta, const Level *level) {
+static bool MoveEnemyWithCollision(Entity *enemy, Vector2 delta, const Level *level) {
     Vector2 originalPos = enemy->position;
+    bool hit = false;
 
     // --- X AXIS ---
     enemy->position.x += delta.x;
@@ -102,6 +103,7 @@ static void MoveEnemyWithCollision(Entity *enemy, Vector2 delta, const Level *le
 
     if (blocked_x) {
         enemy->position.x = originalPos.x;
+        hit = true;
     }
 
     // --- Y AXIS ---
@@ -124,7 +126,10 @@ static void MoveEnemyWithCollision(Entity *enemy, Vector2 delta, const Level *le
 
     if (blocked_y) {
         enemy->position.y = originalPos.y;
+        hit = true;
     }
+    
+    return hit;
 }
 
 void UpdateEnemy(Entity *enemy, Vector2 playerPos, Level *level, Bullet *bulletPool,
@@ -257,10 +262,18 @@ void UpdateEnemy(Entity *enemy, Vector2 playerPos, Level *level, Bullet *bulletP
                if (dist > 20) {
                    // Moving to search target
                    Vector2 delta = Vector2Scale(Vector2Normalize(toLast), enemy->identity.speed * dt);
-                   MoveEnemyWithCollision(enemy, delta, level); // This handles walls
-                   float targetAngle = atan2f(toLast.y, toLast.x) * RAD2DEG;
-                   enemy->rotation = targetAngle;
-               } else {
+                   bool bumped = MoveEnemyWithCollision(enemy, delta, level); // This handles walls
+                   
+                   // If we bumped into something while searching, just stop and look around
+                   if (bumped) {
+                        dist = 0; // Force transition to "Arrived" logic below
+                   } else {
+                        float targetAngle = atan2f(toLast.y, toLast.x) * RAD2DEG;
+                        enemy->rotation = targetAngle;
+                   }
+               }
+               
+               if (dist <= 20) {
                    // Arrived at last known, wait 3 seconds
                    enemy->searchTimer -= dt;
                    // Spin around looking
@@ -282,11 +295,15 @@ void UpdateEnemy(Entity *enemy, Vector2 playerPos, Level *level, Bullet *bulletP
               
               if (dist > 10) {
                   Vector2 delta = Vector2Scale(Vector2Normalize(toTarget), enemy->identity.speed * 0.5f * dt);
-                  MoveEnemyWithCollision(enemy, delta, level);
-                  enemy->rotation = atan2f(toTarget.y, toTarget.x) * RAD2DEG;
+                  bool bumped = MoveEnemyWithCollision(enemy, delta, level);
                   
-                  // If stuck (didn't move), give up
-                  // Optimization: Store prev pos, checks
+                  if (bumped) {
+                      // We hit a wall while blindly patrolling. This target is bad. Find new one.
+                      enemy->state = STATE_IDLE;
+                      enemy->searchTimer = 0.5f; // Wait briefly
+                  } else {
+                      enemy->rotation = atan2f(toTarget.y, toTarget.x) * RAD2DEG;
+                  }
               } else {
                   // Reached patrol point
                   enemy->state = STATE_IDLE; 
