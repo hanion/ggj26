@@ -253,7 +253,7 @@ static Vector2 GetScaledMousePosition(void) {
     return mousePos;
 }
 
-static void UpdateMenu(void) {
+static bool UpdateMenu(void) {
     Vector2 mousePos = GetScaledMousePosition();
 
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
@@ -262,9 +262,10 @@ static void UpdateMenu(void) {
         } else if (CheckCollisionPointRec(mousePos, btnEpisode2)) {
             StartLevel(2);
         } else if (CheckCollisionPointRec(mousePos, btnQuit)) {
-            CloseWindow();
+            return false;
         }
     }
+    return true;
 }
 
 static void DrawMenu(void) {
@@ -694,11 +695,11 @@ static void DrawGame(void) {
 
 bool Game_Update(void) {
     if (currentState == STATE_MENU) {
-        UpdateMenu();
+        return UpdateMenu();
     } else {
         UpdateGame(GetFrameTime());
+        return true;
     }
-    return true;
 }
 
 void Game_Draw(void) {
