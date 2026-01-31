@@ -16,6 +16,65 @@ typedef enum {
     PR_WEAPON_RELOAD,
 } PRWeaponState;
 
+void PlayerRender_DrawFallback(Vector2 position, float radius) {
+    float size = radius * 2.0f;
+    DrawRectangleV((Vector2){position.x - radius, position.y - radius},
+                   (Vector2){size, size}, RED);
+}
+
+
+bool PlayerRender_TryComputePivotFromFrame(Texture2D frame,
+                                          unsigned char alphaThreshold,
+                                          Vector2 *outPivot) {
+    if (!outPivot || frame.id == 0) {
+        return false;
+    }
+
+    Image image = LoadImageFromTexture(frame);
+    if (image.data == NULL) {
+        TraceLog(LOG_WARNING, "Failed to read player frame for pivot");
+        return false;
+    }
+
+    if (image.format != PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) {
+        ImageFormat(&image, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
+    }
+
+    unsigned char *pixels = (unsigned char *)image.data;
+    int minX = image.width;
+    int maxX = -1;
+    int minY = image.height;
+    int maxY = -1;
+    bool found = false;
+
+    for (int y = 0; y < image.height; y++) {
+        for (int x = 0; x < image.width; x++) {
+            int index = (y * image.width + x) * 4 + 3;
+            unsigned char alpha = pixels[index];
+            if (alpha > alphaThreshold) {
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+                found = true;
+            }
+        }
+    }
+
+    if (found) {
+        float centerX = (minX + maxX) * 0.5f;
+        float centerY = (minY + maxY) * 0.5f;
+        *outPivot = (Vector2){centerX / (float)image.width,
+                              centerY / (float)image.height};
+    } else {
+        TraceLog(LOG_WARNING, "Player frame had no opaque pixels for pivot");
+    }
+
+    UnloadImage(image);
+    return found;
+}
+
+
 static void DrawFrame(Texture2D frame, Vector2 position, float rotation, float scale, Vector2 pivot) {
     Rectangle source = (Rectangle){0.0f, 0.0f, (float)frame.width, (float)frame.height};
 

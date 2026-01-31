@@ -14,6 +14,10 @@
 #include "player/player_render.h"
 #include "types.h"
 
+#include "game_context.h"
+
+#include "player/player_actions.h"
+
 #include "ui/hud.h"
 
 // Game Constants
@@ -35,71 +39,12 @@ typedef enum {
     STATE_WIN
 } GameState;
 
-// --- GAME CONTEXT ---
-// This holds progression state that should be shared across screens and later used for saving/loading.
-typedef struct {
-    int nextEpisodeId;     // The episode a player should play next (story progression).
-    bool hasProgress;      // True once the player has started at least one episode.
-    bool hasWonLastEpisode; // Set when the active episode is completed.
-
-    // Player progression context (carry to the next episode).
-    // This is the core of future save/load.
-    struct {
-        bool valid;
-        Identity identity;
-        PlayerEquipState equipped;
-        int magAmmo;
-        int reserveAmmo;
-
-        // Lightweight inventory (which weapons are owned/unlocked).
-        // We treat knife + bare hands as always available.
-        bool hasFlashlight;
-        bool hasHandgun;
-        bool hasRifle;
-        bool hasShotgun;
-    } player;
-} GameContext;
-
 static GameState currentState;
 static Level currentLevel;
 static bool gameOver; 
 static bool gameWon; 
 
 static GameContext gameCtx;
-
-static void SavePlayerContextFromLivePlayer(const Entity *livePlayer) {
-    if (!livePlayer) return;
-    gameCtx.player.valid = true;
-    gameCtx.player.identity = livePlayer->identity;
-    gameCtx.player.equipped = livePlayer->equipmentState;
-    gameCtx.player.magAmmo = livePlayer->magAmmo;
-    gameCtx.player.reserveAmmo = livePlayer->reserveAmmo;
-
-    // Inventory inference: if you've ever equipped it, you own it.
-    // (Later, real pickups can set these flags directly.)
-    switch (livePlayer->equipmentState) {
-        case PLAYER_EQUIP_FLASHLIGHT: gameCtx.player.hasFlashlight = true; break;
-        case PLAYER_EQUIP_HANDGUN: gameCtx.player.hasHandgun = true; break;
-        case PLAYER_EQUIP_RIFLE: gameCtx.player.hasRifle = true; break;
-        case PLAYER_EQUIP_SHOTGUN: gameCtx.player.hasShotgun = true; break;
-        default: break;
-    }
-}
-
-static bool PlayerContext_AllowsEquip(PlayerEquipState equip) {
-    // Always allowed
-    if (equip == PLAYER_EQUIP_BARE_HANDS || equip == PLAYER_EQUIP_KNIFE) return true;
-
-    if (!gameCtx.player.valid) return false;
-
-    switch (equip) {
-        case PLAYER_EQUIP_FLASHLIGHT: return gameCtx.player.hasFlashlight;
-        case PLAYER_EQUIP_HANDGUN: return gameCtx.player.hasHandgun;
-        case PLAYER_EQUIP_RIFLE: return gameCtx.player.hasRifle;
-        case PLAYER_EQUIP_SHOTGUN: return gameCtx.player.hasShotgun;
-        default: return false;
-    }
-}
 
 static Entity player;
 static Camera2D camera;
@@ -126,94 +71,6 @@ static const unsigned char playerPivotAlphaThreshold = 32;
 static PlayerEquipState lastEquipmentState;
 
 // HUD is implemented in ui/hud.c now.
-
-static void DrawPlayerFallback(Vector2 position, float radius) {
-    float size = radius * 2.0f;
-    DrawRectangleV((Vector2){position.x - radius, position.y - radius},
-                   (Vector2){size, size}, RED);
-}
-
-static void UpdatePlayerPivotFromFrame(Texture2D frame) {
-    if (playerFramePivotReady || frame.id == 0) {
-        return;
-    }
-    Image image = LoadImageFromTexture(frame);
-    if (image.data == NULL) {
-        TraceLog(LOG_WARNING, "Failed to read player frame for pivot");
-        return;
-    }
-    if (image.format != PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) {
-        ImageFormat(&image, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
-    }
-    unsigned char *pixels = (unsigned char *)image.data;
-    int minX = image.width;
-    int maxX = -1;
-    int minY = image.height;
-    int maxY = -1;
-    bool found = false;
-
-    for (int y = 0; y < image.height; y++) {
-        for (int x = 0; x < image.width; x++) {
-            int index = (y * image.width + x) * 4 + 3;
-            unsigned char alpha = pixels[index];
-            if (alpha > playerPivotAlphaThreshold) {
-                if (x < minX) minX = x;
-                if (x > maxX) maxX = x;
-                if (y < minY) minY = y;
-                if (y > maxY) maxY = y;
-                found = true;
-            }
-        }
-    }
-
-    if (found) {
-        float centerX = (minX + maxX) * 0.5f;
-        float centerY = (minY + maxY) * 0.5f;
-        playerFramePivot = (Vector2){centerX / (float)image.width,
-                                     centerY / (float)image.height};
-        playerFramePivotReady = true;
-    } else {
-        TraceLog(LOG_WARNING, "Player frame had no opaque pixels for pivot");
-    }
-    UnloadImage(image);
-}
-
-static int GetClosestEnemyInRange(Vector2 position, float range) {
-    float closestDist = range;
-    int closestIndex = -1;
-    for (int i = 0; i < currentLevel.enemyCount; i++) {
-        if (!currentLevel.enemies[i].active) {
-            continue;
-        }
-        float dist = Vector2Distance(position, currentLevel.enemies[i].position);
-        if (dist <= closestDist) {
-            closestDist = dist;
-            closestIndex = i;
-        }
-    }
-    return closestIndex;
-}
-
-static void HandleEnemyKilled(int enemyIndex) {
-    if (enemyIndex < 0 || enemyIndex >= currentLevel.enemyCount) {
-        return;
-    }
-    if (!currentLevel.enemies[enemyIndex].active) {
-        return;
-    }
-    currentLevel.enemies[enemyIndex].active = false;
-    maskActive = true;
-    droppedMask.identity = currentLevel.enemies[enemyIndex].identity;
-    droppedMask.position = currentLevel.enemies[enemyIndex].position;
-    droppedMask.radius = droppedMaskRadius;
-    droppedMask.active = true;
-    // Auto-equip handgun after a kill (so player can shoot instead of staying on knife).
-    // If you later add actual weapon pickups, move this to that pickup logic instead.
-    if (player.equipmentState == PLAYER_EQUIP_KNIFE || player.equipmentState == PLAYER_EQUIP_BARE_HANDS) {
-        player.equipmentState = PLAYER_EQUIP_HANDGUN;
-        TraceLog(LOG_INFO, "Player auto-equipped handgun after kill");
-    }
-}
 
 // --- MENU BUTTONS ---
 static Rectangle btnEpisode1;
@@ -255,9 +112,9 @@ static void StartLevel(int episodeId) {
         player.identity = gameCtx.player.identity;
         player.magAmmo = gameCtx.player.magAmmo;
         player.reserveAmmo = gameCtx.player.reserveAmmo;
-        player.equipmentState = PlayerContext_AllowsEquip(gameCtx.player.equipped)
-                                  ? gameCtx.player.equipped
-                                  : PLAYER_EQUIP_KNIFE;
+    player.equipmentState = GameContext_AllowsEquip(&gameCtx, gameCtx.player.equipped)
+                  ? gameCtx.player.equipped
+                  : PLAYER_EQUIP_KNIFE;
     } else {
         // Fresh episode start (new game / replay): defaults
         player.equipmentState = PLAYER_EQUIP_KNIFE;
@@ -291,7 +148,11 @@ static void StartLevel(int episodeId) {
     
     playerFramePivotReady = false;
     if (playerRender.loaded) {
-        UpdatePlayerPivotFromFrame(AnimPlayer_GetFrame(&playerRender.feetAnim));
+        if (PlayerRender_TryComputePivotFromFrame(AnimPlayer_GetFrame(&playerRender.feetAnim),
+                                                  playerPivotAlphaThreshold,
+                                                  &playerFramePivot)) {
+            playerFramePivotReady = true;
+        }
     }
 }
 
@@ -299,11 +160,7 @@ void Game_Init(void) {
     currentState = STATE_MENU;
 
     // Start a fresh story by default.
-    gameCtx = (GameContext){0};
-    gameCtx.nextEpisodeId = 1;
-
-    // Default baseline player context (future: load-from-save).
-    gameCtx.player.valid = false;
+    GameContext_Init(&gameCtx);
 
     Hud_Init();
 
@@ -428,7 +285,7 @@ static void UpdateGame(float dt) {
         if (gameWon) {
             // Update progress context (used by Continue / Next).
             gameCtx.hasWonLastEpisode = true;
-            SavePlayerContextFromLivePlayer(&player);
+            GameContext_SaveFromPlayer(&gameCtx, &player);
             if (currentLevel.id == 1) {
                 gameCtx.nextEpisodeId = 2;
             }
@@ -564,9 +421,14 @@ static void UpdateGame(float dt) {
     if (player.equipmentState == PLAYER_EQUIP_KNIFE || 
         player.equipmentState == PLAYER_EQUIP_FLASHLIGHT ||
         player.equipmentState == PLAYER_EQUIP_BARE_HANDS) {
-        meleeTargetIndex = GetClosestEnemyInRange(player.position, meleeRange);
+        meleeTargetIndex = PlayerActions_GetClosestEnemyInRange(&currentLevel, player.position, meleeRange);
         if (meleeTargetIndex != -1 && IsKeyPressed(KEY_E)) {
-            HandleEnemyKilled(meleeTargetIndex);
+            PlayerActions_HandleEnemyKilled(&currentLevel,
+                                            meleeTargetIndex,
+                                            &player,
+                                            &droppedMask,
+                                            &maskActive,
+                                            droppedMaskRadius);
             meleeTargetIndex = -1;
         }
     }
@@ -604,7 +466,12 @@ static void UpdateGame(float dt) {
                     CheckCollisionCircles(bullets[i].position, bullets[i].radius,
                                           currentLevel.enemies[e].position, currentLevel.enemies[e].radius)) {
                     bullets[i].active = false;
-                    HandleEnemyKilled(e);
+                    PlayerActions_HandleEnemyKilled(&currentLevel,
+                                                    e,
+                                                    &player,
+                                                    &droppedMask,
+                                                    &maskActive,
+                                                    droppedMaskRadius);
                 }
             }
         } else {
@@ -723,7 +590,7 @@ static void DrawGame(void) {
             PlayerRender_Draw(&playerRender, &player);
             PlayerRender_DrawMuzzleFlash(&playerRender, &player, weaponShootTimer);
         } else {
-            DrawPlayerFallback(player.position, player.radius);
+            PlayerRender_DrawFallback(player.position, player.radius);
         }
         if (meleeTargetIndex >= 0 && meleeTargetIndex < currentLevel.enemyCount &&
             currentLevel.enemies[meleeTargetIndex].active) {
