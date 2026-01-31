@@ -17,6 +17,12 @@ typedef struct {
 } Background;
 
 typedef struct {
+    Rectangle rect;
+    PermissionLevel requiredPerm;
+    bool isOpen;
+} Door;
+
+typedef struct {
   int id; // Phase/Episode ID
 
   // Level Layout
@@ -24,9 +30,7 @@ typedef struct {
   int wallCount;
 
   // Interactive Objects
-  Rectangle doors[MAX_DOORS];
-  PermissionLevel doorPerms[MAX_DOORS];
-  bool doorsOpen[MAX_DOORS];
+  Door doors[MAX_DOORS];
   int doorCount;
 
   // NPCs
