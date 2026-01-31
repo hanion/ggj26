@@ -4,6 +4,12 @@
 #include "../entity.h"
 #include "../levels.h"
 
+// Factory to create a new enemy based on type
+Entity InitEnemy(Vector2 position, EnemyType type);
+
+// Get default identity for a type (useful for player init or other needs)
+Identity GetIdentity(EnemyType type);
+
 // Updates a single enemy instance (AI, Shooting, etc.)
 // Returns true if the enemy fired a shot (helper for bullet spawning if needed,
 // Update an enemy (AI logic)

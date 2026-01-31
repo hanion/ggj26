@@ -5,6 +5,7 @@
 
 #include "../raylib/src/raylib.h"
 #include "../raylib/src/raymath.h"
+#include "anim.h"
 #include "enemies/enemy.h"
 #include "entity.h"
 #include "episodes/episodes.h"
@@ -19,9 +20,17 @@
 #define BULLET_LIFETIME 2.0f
 
 // --- GAME STATE ---
+typedef enum {
+    STATE_MENU,
+    STATE_PLAYING,
+    STATE_GAMEOVER,
+    STATE_WIN
+} GameState;
+
+static GameState currentState;
 static Level currentLevel;
-static bool gameOver;
-static bool gameWon;
+static bool gameOver; 
+static bool gameWon; 
 
 static Entity player;
 static Camera2D camera;
@@ -83,15 +92,20 @@ void Game_Init(void) {
     gameOver = false;
     gameWon = false;
     maskActive = false;
+    currentState = STATE_PLAYING;
 
     // Reset bullets
     for (int i = 0; i < MAX_BULLETS; i++) bullets[i].active = false;
 
     // Init Level
-    InitLevel(1, &currentLevel);
+    InitLevel(episodeId, &currentLevel);
 
     // Player
     player = InitPlayer(currentLevel.playerSpawn, currentLevel.playerStartId);
+    player.equipmentState = PLAYER_EQUIP_BARE_HANDS;
+    player.rotation = 0.0f;
+    playerGunShootTimer = 0.0f;
+    lastEquipmentState = player.equipmentState;
 
     // Camera
     camera = (Camera2D){0};
@@ -113,16 +127,88 @@ void Game_Init(void) {
     texZone7 = LoadTexture("assets/environment/background_7.png");
 }
 
-void Game_Update(void) {
-    float dt = GetFrameTime();
+void Game_Init(void) {
+    currentState = STATE_MENU;
 
+    // Define Menu Buttons (Centered)
+    int sw = GetScreenWidth();
+    int sh = GetScreenHeight();
+    int btnWidth = 200;
+    int btnHeight = 50;
+    int startY = sh / 2 - 50;
+
+    btnEpisode1 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY, (float)btnWidth, (float)btnHeight };
+    btnEpisode2 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 70, (float)btnWidth, (float)btnHeight };
+    btnQuit     = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 140, (float)btnWidth, (float)btnHeight };
+}
+
+// Helper for HighDPI Mouse Scaling
+static Vector2 GetScaledMousePosition(void) {
+    Vector2 mousePos = GetMousePosition();
+    float scaleX = (float)GetScreenWidth() / (float)GetRenderWidth();
+    float scaleY = (float)GetScreenHeight() / (float)GetRenderHeight();
+
+    if (GetScreenWidth() > 0 && GetRenderWidth() > 0) {
+        mousePos.x *= scaleX;
+        mousePos.y *= scaleY;
+    }
+    return mousePos;
+}
+
+static void UpdateMenu(void) {
+    Vector2 mousePos = GetScaledMousePosition();
+
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        if (CheckCollisionPointRec(mousePos, btnEpisode1)) {
+            StartLevel(1);
+        } else if (CheckCollisionPointRec(mousePos, btnEpisode2)) {
+            StartLevel(2);
+        } else if (CheckCollisionPointRec(mousePos, btnQuit)) {
+            CloseWindow();
+        }
+    }
+}
+
+static void DrawMenu(void) {
+    BeginDrawing();
+    ClearBackground((Color){20, 20, 25, 255});
+
+    int sw = GetScreenWidth();
+    int btnWidth = 200;
+
+    DrawText("GGJ26 - MASK INFILTRATION", sw/2 - 200, 100, 30, RAYWHITE);
+
+    // Buttons
+    Color hoverColor = (Color){50, 50, 60, 255};
+    Color normalColor = GRAY;
+    Vector2 mousePos = GetScaledMousePosition();
+
+    // Episode 1
+    DrawRectangleRec(btnEpisode1, CheckCollisionPointRec(mousePos, btnEpisode1) ? hoverColor : normalColor);
+    DrawText("EPISODE 1", btnEpisode1.x + 40, btnEpisode1.y + 15, 20, WHITE);
+
+    // Episode 2
+    DrawRectangleRec(btnEpisode2, CheckCollisionPointRec(mousePos, btnEpisode2) ? hoverColor : normalColor);
+    DrawText("EPISODE 2", btnEpisode2.x + 40, btnEpisode2.y + 15, 20, WHITE);
+
+    // Quit
+    DrawRectangleRec(btnQuit, CheckCollisionPointRec(mousePos, btnQuit) ? hoverColor : normalColor);
+    DrawText("QUIT", btnQuit.x + 75, btnQuit.y + 15, 20, WHITE);
+    
+    EndDrawing();
+}
+
+static void UpdateGame(float dt) {
     // Update Camera Offset
     camera.offset = (Vector2){ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f };
 
     // Game Over / Win Logic Inputs
     if (gameOver || gameWon) {
         if (IsKeyPressed(KEY_R)) {
-            Game_Init(); // Restart
+            StartLevel(currentLevel.id); // Restart current level
+        }
+        if (IsKeyPressed(KEY_SPACE)) {
+            currentState = STATE_MENU; // Return to menu
         }
         return;
     }
@@ -130,17 +216,82 @@ void Game_Update(void) {
     // Player Update
     UpdatePlayer(&player, &currentLevel, dt);
 
+    // Detect equipment changes (used to kick off one-shot equip animation).
+    if (player.equipmentState != lastEquipmentState) {
+        if (player.equipmentState == PLAYER_EQUIP_GUN && playerGunAnimLoaded) {
+            playerGunShootTimer = 0.0f;
+            playerGunAnimState = PLAYER_GUN_EQUIP;
+            AnimPlayer_SetClip(&playerGunAnim, &playerGunIdleClip); // takeAimGun40
+            playerGunAnim.loop = false; // play once and hold last frame
+        }
+        lastEquipmentState = player.equipmentState;
+    }
+    PlayerAnimState nextState =
+        Vector2Length(player.velocity) > 0.01f ? PLAYER_ANIM_WALK : PLAYER_ANIM_IDLE;
+    if (nextState != playerAnimState) {
+        playerAnimState = nextState;
+        AnimPlayer_SetClip(&playerAnim,
+                           playerAnimState == PLAYER_ANIM_WALK ? &playerWalkClip : &playerIdleClip);
+    }
+    AnimPlayer_Update(&playerAnim, dt);
+
     // Camera Update
     camera.target = Vector2Lerp(camera.target, player.position, 0.1f);
 
     // Player Aiming
     Vector2 mouseWorld = GetScreenToWorld2D(GetMousePosition(), camera);
     Vector2 aimDir = Vector2Subtract(mouseWorld, player.position);
-    player.rotation = atan2f(aimDir.y, aimDir.x) * RAD2DEG;
+    Vector2 aimDirNormalized =
+        Vector2Length(aimDir) > 0.01f ? Vector2Normalize(aimDir) : (Vector2){1.0f, 0.0f};
+
+    // 0 degrees from atan2 is pointing RIGHT (+X).
+    // Set this offset to match how the sprite is authored.
+    // If your sprite faces UP by default, start with -90
+    const float spriteFacingOffsetDeg = +90.0f;
+
+    // If rotation is mirrored (turns the wrong way), flip sign:
+    // float aimDeg = -atan2f(aimDirNormalized.y, aimDirNormalized.x) * RAD2DEG;
+    float aimDeg = atan2f(aimDirNormalized.y, aimDirNormalized.x) * RAD2DEG;
+
+    player.rotation = aimDeg + spriteFacingOffsetDeg;
+    if (playerGunShootTimer > 0.0f) {
+        playerGunShootTimer -= dt;
+        if (playerGunShootTimer < 0.0f) {
+            playerGunShootTimer = 0.0f;
+        }
+    }
+
+    if (player.equipmentState == PLAYER_EQUIP_GUN && playerGunAnimLoaded) {
+        // If we're in the one-shot equip anim, let it finish before entering idle/walk.
+        if (playerGunAnimState == PLAYER_GUN_EQUIP) {
+            AnimPlayer_Update(&playerGunAnim, dt);
+            if (AnimPlayer_IsFinished(&playerGunAnim)) {
+                playerGunAnimState = PLAYER_GUN_IDLE;
+                AnimPlayer_SetClip(&playerGunAnim, &playerGunIdleClip);
+                playerGunAnim.loop = true;
+            }
+        } else {
+            PlayerGunAnimState gunNextState = PLAYER_GUN_IDLE;
+            if (playerGunShootTimer > 0.0f) {
+                gunNextState = PLAYER_GUN_SHOOT;
+            } else if (Vector2Length(player.velocity) > 0.01f) {
+                gunNextState = PLAYER_GUN_WALK;
+            }
+            if (gunNextState != playerGunAnimState) {
+                playerGunAnimState = gunNextState;
+                AnimPlayer_SetClip(&playerGunAnim,
+                                   playerGunAnimState == PLAYER_GUN_SHOOT ? &playerGunShootClip :
+                                   playerGunAnimState == PLAYER_GUN_WALK ? &playerGunWalkClip :
+                                                                           &playerGunIdleClip);
+                playerGunAnim.loop = true;
+            }
+            AnimPlayer_Update(&playerGunAnim, dt);
+        }
+    }
 
     // Player Shooting
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-        if (HasAbility(player.identity, ABILITY_SHOOT)) {
+        if (player.equipmentState == PLAYER_EQUIP_GUN && HasAbility(player.identity, ABILITY_SHOOT)) {
             for (int i = 0; i < MAX_BULLETS; i++) {
                 if (!bullets[i].active) {
                     bullets[i].active = true;
@@ -148,10 +299,20 @@ void Game_Update(void) {
                     bullets[i].radius = BULLET_RADIUS;
                     bullets[i].lifeTime = BULLET_LIFETIME;
                     bullets[i].isPlayerOwned = true;
-                    bullets[i].velocity = Vector2Scale(Vector2Normalize(aimDir), BULLET_SPEED);
+                    bullets[i].velocity = Vector2Scale(aimDirNormalized, BULLET_SPEED);
+                    playerGunShootTimer = playerGunShootHold;
                     break;
                 }
             }
+        }
+    }
+
+    meleeTargetIndex = -1;
+    if (player.equipmentState == PLAYER_EQUIP_BARE_HANDS) {
+        meleeTargetIndex = GetClosestEnemyInRange(player.position, meleeRange);
+        if (meleeTargetIndex != -1 && IsKeyPressed(KEY_E)) {
+            HandleEnemyKilled(meleeTargetIndex);
+            meleeTargetIndex = -1;
         }
     }
 
@@ -189,14 +350,8 @@ void Game_Update(void) {
                 if (currentLevel.enemies[e].active &&
                     CheckCollisionCircles(bullets[i].position, bullets[i].radius,
                                           currentLevel.enemies[e].position, currentLevel.enemies[e].radius)) {
-                    currentLevel.enemies[e].active = false;
                     bullets[i].active = false;
-                    // Drop Mask Logic
-                    maskActive = true;
-                    droppedMask.identity = currentLevel.enemies[e].identity;
-                    droppedMask.position = currentLevel.enemies[e].position;
-                    droppedMask.radius = 15.0f;
-                    droppedMask.active = true;
+                    HandleEnemyKilled(e);
                 }
             }
         } else {
@@ -236,7 +391,7 @@ void Game_Update(void) {
     }
 }
 
-void Game_Draw(void) {
+static void DrawGame(void) {
     BeginDrawing();
     ClearBackground((Color){20, 20, 25, 255});
 
@@ -247,9 +402,11 @@ void Game_Draw(void) {
         if (gameOver) {
             DrawText("GAME OVER", sw / 2 - 100, sh / 2 - 20, 40, RED);
             DrawText("Press R to Restart Level", sw / 2 - 100, sh / 2 + 30, 20, RAYWHITE);
+            DrawText("Press SPACE to Menu", sw / 2 - 100, sh / 2 + 60, 20, RAYWHITE);
         } else {
             DrawText("EPISODE COMPLETE!", sw / 2 - 150, sh / 2 - 20, 40, GOLD);
             DrawText("Press R to Replay", sw / 2 - 100, sh / 2 + 30, 20, RAYWHITE);
+            DrawText("Press SPACE to Menu", sw / 2 - 100, sh / 2 + 60, 20, RAYWHITE);
         }
     } else {
         BeginMode2D(camera);
@@ -358,7 +515,40 @@ void Game_Draw(void) {
             }
         }
 
-        DrawCircleV(player.position, player.radius, player.identity.color);
+        if (playerAnimLoaded) {
+            Texture2D frame = AnimPlayer_GetFrame(&playerAnim);
+            if (player.equipmentState == PLAYER_EQUIP_GUN && playerGunAnimLoaded) {
+                Texture2D gunFrame = AnimPlayer_GetFrame(&playerGunAnim);
+                if (gunFrame.id != 0) {
+                    frame = gunFrame;
+                }
+            }
+            if (playerShadow.id != 0 && frame.id != 0) {
+                DrawPlayerShadow(playerShadow, player.position);
+            }
+            if (frame.id != 0) {
+                DrawPlayerFrame(frame, player.position, player.rotation);
+            } else {
+                DrawPlayerFallback(player.position, player.radius);
+            }
+        } else {
+            DrawPlayerFallback(player.position, player.radius);
+        }
+        if (meleeTargetIndex >= 0 && meleeTargetIndex < currentLevel.enemyCount &&
+            currentLevel.enemies[meleeTargetIndex].active) {
+            Vector2 promptPos = {
+                currentLevel.enemies[meleeTargetIndex].position.x - meleePromptHorizontalOffset,
+                currentLevel.enemies[meleeTargetIndex].position.y - meleePromptOffset
+            };
+            DrawText("PRESS E TO CHOKE", (int)promptPos.x, (int)promptPos.y, 12, WHITE);
+        }
+        if (playerDebugDraw) {
+            DrawLineV((Vector2){player.position.x - playerDebugCrossSize, player.position.y},
+                      (Vector2){player.position.x + playerDebugCrossSize, player.position.y}, RED);
+            DrawLineV((Vector2){player.position.x, player.position.y - playerDebugCrossSize},
+                      (Vector2){player.position.x, player.position.y + playerDebugCrossSize}, RED);
+            DrawCircleLines((int)player.position.x, (int)player.position.y, player.radius, GOLD);
+        }
         Vector2 mouseWorld = GetScreenToWorld2D(GetMousePosition(), camera);
         DrawLineV(player.position, mouseWorld, Fade(WHITE, 0.2f));
         EndMode2D();
@@ -366,15 +556,29 @@ void Game_Draw(void) {
         // HUD
         DrawText(TextFormat("CURRENT LEVEL: %d", player.identity.permissionLevel),
                  20, 20, 20, WHITE);
-
-        if (gameWon) {
-            int sw = GetScreenWidth();
-            DrawText("WINNER!", sw / 2 - 50, 100, 40, GOLD);
-        }
+        DrawText(player.equipmentState == PLAYER_EQUIP_GUN ? "EQUIP: GUN" : "EQUIP: HANDS",
+                 20, 45, 16, WHITE);
     }
 
     EndDrawing();
 }
+
+void Game_Update(void) {
+    if (currentState == STATE_MENU) {
+        UpdateMenu();
+    } else {
+        UpdateGame(GetFrameTime());
+    }
+}
+
+void Game_Draw(void) {
+    if (currentState == STATE_MENU) {
+        DrawMenu();
+    } else {
+        DrawGame();
+    }
+}
+
 
 void Game_Shutdown(void) {
     UnloadTexture(texZone1);
@@ -385,3 +589,4 @@ void Game_Shutdown(void) {
     UnloadTexture(texZone6);
     UnloadTexture(texZone7);
 }
+

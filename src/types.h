@@ -19,6 +19,14 @@ typedef enum {
   ABILITY_DASH = 1 << 2
 } AbilityFlags;
 
+// Enemy Types
+typedef enum {
+  ENEMY_CIVILIAN = 0,
+  ENEMY_STAFF,
+  ENEMY_GUARD,
+  ENEMY_ADMIN
+} EnemyType;
+
 // The "Mask" or "Identity" that defines what an entity can do
 typedef struct {
   PermissionLevel permissionLevel;

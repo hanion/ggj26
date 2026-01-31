@@ -1,4 +1,4 @@
-#include "../entity.h"
+#include "../enemies/enemy.h"
 #include "../types.h"
 #include "episodes.h"
 

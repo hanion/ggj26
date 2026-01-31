@@ -5,9 +5,9 @@
 #include "entity.h"
 #include "types.h"
 
-#define MAX_WALLS 50
-#define MAX_DOORS 10
-#define MAX_ENEMIES 10
+#define MAX_WALLS 200
+#define MAX_DOORS 20
+#define MAX_ENEMIES 50
 
 typedef struct {
   int id; // Phase/Episode ID

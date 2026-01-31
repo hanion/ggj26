@@ -15,6 +15,9 @@ void InitLevel(int episode, Level *level) {
   case 1:
     InitEpisode1(level);
     break;
+  case 2:
+    InitEpisode2(level);
+    break;
   default:
     TraceLog(LOG_WARNING, "Episode %d not found!", episode);
     break;

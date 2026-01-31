@@ -4,6 +4,11 @@
 #include "../raylib/src/raylib.h"
 #include "types.h"
 
+typedef enum {
+  PLAYER_EQUIP_BARE_HANDS,
+  PLAYER_EQUIP_GUN
+} PlayerEquipState;
+
 typedef struct {
   Vector2 position;
   Vector2 velocity;
@@ -16,6 +21,8 @@ typedef struct {
   bool isPlayer;
   float radius;     // Collision size
   float shootTimer; // For AI cooldown
+
+  PlayerEquipState equipmentState;
 } Entity;
 
 typedef struct {
