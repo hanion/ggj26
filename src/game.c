@@ -12,13 +12,10 @@
 #include "levels.h"
 #include "player/player.h"
 #include "player/player_render.h"
-#include "types.h"
-
 #include "game_context.h"
-
 #include "player/player_actions.h"
-
 #include "ui/hud.h"
+#include "types.h"
 
 // Game Constants
 #define MAX_BULLETS 100
@@ -44,45 +41,95 @@ static Level currentLevel;
 static bool gameOver; 
 static bool gameWon; 
 
-static GameContext gameCtx;
-
 static Entity player;
 static Camera2D camera;
 
 static Bullet bullets[MAX_BULLETS];
 static Entity droppedMask;
+static Bullet bullets[MAX_BULLETS];
+static Entity droppedMask;
 static bool maskActive;
 
+static GameContext gameCtx;
+
+
+static Texture2D texZone1;
+static Texture2D texZone2;
+static Texture2D texZone3;
+static Texture2D texZone4;
+static Texture2D texZone5;
+static Texture2D texZone6;
+static Texture2D texZone7;
+
+// --- RENDER & GAMEPLAY STATES ---
 static PlayerRender playerRender;
-static const float weaponShootHold = 0.2f;
 static float weaponShootTimer = 0.0f;
-static const float meleeRange = 80.0f;
-static const float meleePromptOffset = 25.0f;
-static const float meleePromptHorizontalOffset = 40.0f;
-static const float droppedMaskRadius = 15.0f;
-static const float playerDebugCrossSize = 6.0f;
-static const bool playerDebugDraw = false;
+static const float weaponShootHold = 0.2f;
+static PlayerEquipState lastEquipmentState = PLAYER_EQUIP_KNIFE;
+
+// Melee
 static int meleeTargetIndex = -1;
-static Vector2 playerFramePivot = {0.1f, 0.1f};
-static bool playerFramePivotReady = false;
-static const unsigned char playerPivotAlphaThreshold = 32;
+static float meleeRange = 40.0f;
+static float meleePromptOffset = 40.0f;
+static float meleePromptHorizontalOffset = 40.0f;
+static float droppedMaskRadius = 15.0f;
 
-// Track equipment transitions for gameplay (rendering handles its own internal state).
-static PlayerEquipState lastEquipmentState;
+// Debug
+static bool playerDebugDraw = false;
+static float playerDebugCrossSize = 10.0f;
 
-// HUD is implemented in ui/hud.c now.
-
-// --- MENU BUTTONS ---
+// Menu Buttons
 static Rectangle btnEpisode1;
 static Rectangle btnEpisode2;
 static Rectangle btnQuit;
-
-// Player menu (shown in non-dev builds)
 static Rectangle btnPlay;
 static Rectangle btnContinue;
 
-// Helper to reset game state for a specific level
-static void StartLevel(int episodeId) {
+// Helper function to simulate DrawTextureTiled
+void DrawTextureTiled(Texture2D texture, Rectangle source, Rectangle dest, Vector2 origin, float rotation, float scale, Color tint) {
+    if ((texture.id <= 0) || (scale <= 0.0f)) return;  // Wav, what about 0 scale? w/e
+    
+    // Grid size
+    int tileWidth = (int)((float)source.width * scale);
+    int tileHeight = (int)((float)source.height * scale);
+    
+    if ((dest.width < tileWidth) && (dest.height < tileHeight)) {
+        // Can fit one tile partially
+        DrawTexturePro(texture, (Rectangle){source.x, source.y, ((float)dest.width/tileWidth)*source.width, ((float)dest.height/tileHeight)*source.height},
+            (Rectangle){dest.x + origin.x, dest.y + origin.y, dest.width, dest.height}, origin, rotation, tint);
+    } else {
+        int dx = 0;
+        int dy = 0;
+        
+        while (dy < (int)dest.height) {
+            dx = 0;
+            while (dx < (int)dest.width) {
+                 // Calculate Draw Area
+                 float drawW = (float)tileWidth;
+                 float drawH = (float)tileHeight;
+                 
+                 if (dx + tileWidth > dest.width) drawW = (float)(dest.width - dx);
+                 if (dy + tileHeight > dest.height) drawH = (float)(dest.height - dy);
+                 
+                 // Draw part of texture
+                 DrawTexturePro(texture, 
+                     (Rectangle){source.x, source.y, (drawW/tileWidth)*source.width, (drawH/tileHeight)*source.height},
+                     (Rectangle){dest.x + dx + origin.x, dest.y + dy + origin.y, drawW, drawH},
+                     (Vector2){0, 0}, rotation, tint);
+
+                 dx += tileWidth;
+            }
+            dy += tileHeight;
+        }
+    }
+}
+// Removed old Game_Init logic
+
+
+// --- FOG OF WAR STATE ---
+static bool visitedZones[7];
+
+void StartLevel(int id) {
     gameOver = false;
     gameWon = false;
     gameCtx.hasWonLastEpisode = false;
@@ -93,7 +140,7 @@ static void StartLevel(int episodeId) {
     for (int i = 0; i < MAX_BULLETS; i++) bullets[i].active = false;
 
     // Init Level
-    InitLevel(episodeId, &currentLevel);
+    InitLevel(id, &currentLevel);
 
     // Progress context
     gameCtx.hasProgress = true;
@@ -107,14 +154,14 @@ static void StartLevel(int episodeId) {
 
     // Story progression: if we have a saved player context AND we're starting the next episode,
     // carry identity/equipment/ammo/inventory across.
-    bool shouldCarryPlayer = gameCtx.player.valid && (episodeId == gameCtx.nextEpisodeId);
+    bool shouldCarryPlayer = gameCtx.player.valid && (id == gameCtx.nextEpisodeId);
     if (shouldCarryPlayer) {
         player.identity = gameCtx.player.identity;
         player.magAmmo = gameCtx.player.magAmmo;
         player.reserveAmmo = gameCtx.player.reserveAmmo;
-    player.equipmentState = GameContext_AllowsEquip(&gameCtx, gameCtx.player.equipped)
-                  ? gameCtx.player.equipped
-                  : PLAYER_EQUIP_KNIFE;
+        player.equipmentState = GameContext_AllowsEquip(&gameCtx, gameCtx.player.equipped)
+                      ? gameCtx.player.equipped
+                      : PLAYER_EQUIP_KNIFE;
     } else {
         // Fresh episode start (new game / replay): defaults
         player.equipmentState = PLAYER_EQUIP_KNIFE;
@@ -122,17 +169,21 @@ static void StartLevel(int episodeId) {
         player.reserveAmmo = RESERVE_AMMO_START;
 
         // Also reset inventory to a minimal baseline.
-    gameCtx.player.valid = true;
-    gameCtx.player.identity = player.identity;
-    gameCtx.player.equipped = player.equipmentState;
-    gameCtx.player.magAmmo = player.magAmmo;
-    gameCtx.player.reserveAmmo = player.reserveAmmo;
-    gameCtx.player.hasFlashlight = true; // optional baseline; feels nice for early game
-    gameCtx.player.hasHandgun = false;
-    gameCtx.player.hasRifle = false;
-    gameCtx.player.hasShotgun = false;
+        gameCtx.player.valid = true;
+        gameCtx.player.identity = player.identity;
+        gameCtx.player.equipped = player.equipmentState;
+        gameCtx.player.magAmmo = player.magAmmo;
+        gameCtx.player.reserveAmmo = player.reserveAmmo;
+        gameCtx.player.hasFlashlight = true; 
+        gameCtx.player.hasHandgun = false;
+        gameCtx.player.hasRifle = false;
+        gameCtx.player.hasShotgun = false;
     }
     lastEquipmentState = player.equipmentState;
+    
+    // Reset Visited Zones (Fog of War)
+    for (int i = 0; i < 7; i++) visitedZones[i] = false;
+    visitedZones[0] = true; 
 
     // Camera
     camera = (Camera2D){0};
@@ -141,24 +192,24 @@ static void StartLevel(int episodeId) {
     camera.rotation = 0.0f;
     camera.zoom = 1.0f;
 
-    // Player visuals/animations
+    // Load Textures
+    if (texZone1.id == 0)texZone1 = LoadTexture("assets/environment/background_1.png");
+    if (texZone2.id == 0)texZone2 = LoadTexture("assets/environment/background_2.png");
+    if (texZone3.id == 0)texZone3 = LoadTexture("assets/environment/background_3.png");
+    if (texZone4.id == 0)texZone4 = LoadTexture("assets/environment/background_4.png");
+    if (texZone5.id == 0)texZone5 = LoadTexture("assets/environment/background_5.png");
+    if (texZone6.id == 0)texZone6 = LoadTexture("assets/environment/background_6.png");
+    if (texZone7.id == 0)texZone7 = LoadTexture("assets/environment/background_7.png");
+
+    // Init Player Render
     PlayerRender_Init(&playerRender);
-    playerRender.lastEquip = player.equipmentState;
     PlayerRender_LoadEpisodeAssets(&playerRender);
-    
-    playerFramePivotReady = false;
-    if (playerRender.loaded) {
-        if (PlayerRender_TryComputePivotFromFrame(AnimPlayer_GetFrame(&playerRender.feetAnim),
-                                                  playerPivotAlphaThreshold,
-                                                  &playerFramePivot)) {
-            playerFramePivotReady = true;
-        }
-    }
+    PlayerRender_OnEquip(&playerRender, player.equipmentState);
 }
 
 void Game_Init(void) {
     currentState = STATE_MENU;
-
+    
     // Start a fresh story by default.
     GameContext_Init(&gameCtx);
 
@@ -174,7 +225,7 @@ void Game_Init(void) {
     btnEpisode1 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY, (float)btnWidth, (float)btnHeight };
     btnEpisode2 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 70, (float)btnWidth, (float)btnHeight };
     btnQuit     = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 140, (float)btnWidth, (float)btnHeight };
-
+    
     // Player-facing menu buttons reuse the same layout slots.
     btnPlay     = btnEpisode1;
     btnContinue = btnEpisode2;
@@ -193,36 +244,18 @@ static Vector2 GetScaledMousePosition(void) {
     return mousePos;
 }
 
-static bool UpdateMenu(void) {
+static void UpdateMenu(void) {
     Vector2 mousePos = GetScaledMousePosition();
 
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-        // Developer build: manual episode picking.
-#if defined(DEV_MODE) && (DEV_MODE)
         if (CheckCollisionPointRec(mousePos, btnEpisode1)) {
             StartLevel(1);
         } else if (CheckCollisionPointRec(mousePos, btnEpisode2)) {
             StartLevel(2);
         } else if (CheckCollisionPointRec(mousePos, btnQuit)) {
-            return false;
+            CloseWindow();
         }
-#else
-        // Player build: story-driven flow.
-        if (CheckCollisionPointRec(mousePos, btnPlay)) {
-            // New Game
-            gameCtx.nextEpisodeId = 1;
-            StartLevel(gameCtx.nextEpisodeId);
-        } else if (CheckCollisionPointRec(mousePos, btnContinue)) {
-            // Continue (only if player has started before)
-            if (gameCtx.hasProgress) {
-                StartLevel(gameCtx.nextEpisodeId);
-            }
-        } else if (CheckCollisionPointRec(mousePos, btnQuit)) {
-            return false;
-        }
-#endif
     }
-    return true;
 }
 
 static void DrawMenu(void) {
@@ -239,24 +272,13 @@ static void DrawMenu(void) {
     Color normalColor = GRAY;
     Vector2 mousePos = GetScaledMousePosition();
 
-    // Developer build: manual stage/episode picking.
-#if defined(DEV_MODE) && (DEV_MODE)
+    // Episode 1
     DrawRectangleRec(btnEpisode1, CheckCollisionPointRec(mousePos, btnEpisode1) ? hoverColor : normalColor);
     DrawText("EPISODE 1", btnEpisode1.x + 40, btnEpisode1.y + 15, 20, WHITE);
 
+    // Episode 2
     DrawRectangleRec(btnEpisode2, CheckCollisionPointRec(mousePos, btnEpisode2) ? hoverColor : normalColor);
     DrawText("EPISODE 2", btnEpisode2.x + 40, btnEpisode2.y + 15, 20, WHITE);
-#else
-    // Player build: story menu.
-    DrawRectangleRec(btnPlay, CheckCollisionPointRec(mousePos, btnPlay) ? hoverColor : normalColor);
-    DrawText("PLAY", btnPlay.x + 70, btnPlay.y + 15, 20, WHITE);
-
-    bool canContinue = gameCtx.hasProgress;
-    Color continueColor = canContinue ? normalColor : Fade(normalColor, 0.35f);
-    Color continueTextColor = canContinue ? WHITE : Fade(WHITE, 0.5f);
-    DrawRectangleRec(btnContinue, CheckCollisionPointRec(mousePos, btnContinue) && canContinue ? hoverColor : continueColor);
-    DrawText("CONTINUE", btnContinue.x + 45, btnContinue.y + 15, 20, continueTextColor);
-#endif
 
     // Quit
     DrawRectangleRec(btnQuit, CheckCollisionPointRec(mousePos, btnQuit) ? hoverColor : normalColor);
@@ -331,7 +353,7 @@ static void UpdateGame(float dt) {
     // Detect equipment changes
     if (player.equipmentState != lastEquipmentState) {
         weaponShootTimer = 0.0f;
-    PlayerRender_OnEquip(&playerRender, player.equipmentState);
+        PlayerRender_OnEquip(&playerRender, player.equipmentState);
         lastEquipmentState = player.equipmentState;
     }
 
@@ -345,12 +367,8 @@ static void UpdateGame(float dt) {
         Vector2Length(aimDir) > 0.01f ? Vector2Normalize(aimDir) : (Vector2){1.0f, 0.0f};
 
     // 0 degrees from atan2 is pointing RIGHT (+X).
-    // Set this offset to match how the sprite is authored.
-    // If your sprite faces UP by default, start with -90
     const float spriteFacingOffsetDeg = 0.0f;
 
-    // If rotation is mirrored (turns the wrong way), flip sign:
-    // float aimDeg = -atan2f(aimDirNormalized.y, aimDirNormalized.x) * RAD2DEG;
     float aimDeg = atan2f(aimDirNormalized.y, aimDirNormalized.x) * RAD2DEG;
 
     player.rotation = aimDeg + spriteFacingOffsetDeg;
@@ -361,14 +379,14 @@ static void UpdateGame(float dt) {
         }
     }
 
-    // Update all player visual animation state in one place.
+    // Update all player visual animation state
     PlayerRender_Update(&playerRender, &player, dt, weaponShootTimer);
     
     // Handle reload timer
     if (player.isReloading) {
         player.reloadTimer -= dt;
         if (player.reloadTimer <= 0.0f) {
-            // Reload complete - transfer ammo
+            // Reload complete
             int ammoNeeded = MAG_SIZE - player.magAmmo;
             int ammoToTransfer = ammoNeeded < player.reserveAmmo ? ammoNeeded : player.reserveAmmo;
             player.magAmmo += ammoToTransfer;
@@ -409,7 +427,7 @@ static void UpdateGame(float dt) {
                     }
                 }
             } else {
-                // Auto-reload when trying to shoot with empty mag
+                // Auto-reload
                 if (player.reserveAmmo > 0) {
                     player.isReloading = true;
                     player.reloadTimer = RELOAD_DURATION;
@@ -436,7 +454,7 @@ static void UpdateGame(float dt) {
 
     // Enemy Update
     for (int i = 0; i < currentLevel.enemyCount; i++) {
-        UpdateEnemy(&currentLevel.enemies[i], player.position, bullets, MAX_BULLETS, dt);
+        UpdateEnemy(&currentLevel.enemies[i], player.position, bullets, MAX_BULLETS, dt, &currentLevel);
     }
 
     // Bullet Updates & Collisions
@@ -505,8 +523,8 @@ static void UpdateGame(float dt) {
     }
 
     // Win Condition
-    if (player.position.x > currentLevel.winX) {
-        gameWon = true; // Win current level
+    if (player.position.y > 2200.0f) {
+        gameWon = true;
     }
 }
 
@@ -538,94 +556,88 @@ static void DrawGame(void) {
         }
     } else {
         BeginMode2D(camera);
+
+        // Zone 1
+        DrawTexturePro(texZone1, (Rectangle){0,0,texZone1.width,texZone1.height}, (Rectangle){0,0,913,642}, (Vector2){0,0}, 0.f, WHITE);
+        // Zone 2
+        DrawTexturePro(texZone2, (Rectangle){0,0,texZone2.width,texZone2.height}, (Rectangle){913,0,911,661}, (Vector2){0,0}, 0.f, WHITE);
+        // Zone 3
+        DrawTexturePro(texZone3, (Rectangle){0,0,texZone3.width,texZone3.height}, (Rectangle){1824,0,957,654}, (Vector2){0,0}, 0.f, WHITE);
+        // Zone 4
+        DrawTexturePro(texZone4, (Rectangle){0,0,texZone4.width,texZone4.height}, (Rectangle){1824,654,869,645}, (Vector2){0,0}, 0.f, WHITE);
+        // Zone 5
+        DrawTexturePro(texZone5, (Rectangle){0,0,texZone5.width,texZone5.height}, (Rectangle){957,654,867,649}, (Vector2){0,0}, 0.f, WHITE);
+        // Zone 6
+        DrawTexturePro(texZone6, (Rectangle){0,0,texZone6.width,texZone6.height}, (Rectangle){162,654,795,853}, (Vector2){0,0}, 0.f, WHITE);
+        // Zone 7
+        DrawTexturePro(texZone7, (Rectangle){0,0,texZone7.width,texZone7.height}, (Rectangle){162,1507,795,805}, (Vector2){0,0}, 0.f, WHITE);
+
         // Draw Level Elements
-        for (int i = 0; i < currentLevel.wallCount; i++)
-            DrawRectangleRec(currentLevel.walls[i], GRAY);
+        for (int i = 0; i < currentLevel.wallCount; i++) DrawRectangleRec(currentLevel.walls[i], GRAY);
         for (int i = 0; i < currentLevel.doorCount; i++) {
             Color dColor = currentLevel.doorsOpen[i] ? GREEN : DARKGRAY;
-            if (!currentLevel.doorsOpen[i]) {
-                DrawRectangleRec(currentLevel.doors[i], dColor);
-                DrawText(TextFormat("REQ: LVL %d", currentLevel.doorPerms[i]),
-                         (int)currentLevel.doors[i].x - 10,
-                         (int)currentLevel.doors[i].y + 50, 10, WHITE);
-            } else {
-                DrawRectangleLinesEx(currentLevel.doors[i], 3.0f, GREEN);
-            }
+            if (!currentLevel.doorsOpen[i]) DrawRectangleRec(currentLevel.doors[i], dColor);
+            else DrawRectangleLinesEx(currentLevel.doors[i], 3.0f, GREEN);
         }
 
         if (currentLevel.id == 1) {
-            DrawText("ZONE 1: STAFF ONLY", 400, 300, 30, Fade(WHITE, 0.1f));
-            DrawText("ZONE 2: GUARD ONLY", 1400, 300, 30, Fade(WHITE, 0.1f));
-            DrawText("ZONE 3: ADMIN ONLY", 2400, 300, 30, Fade(WHITE, 0.1f));
-            DrawText("EXIT", 3200, 300, 40, Fade(GREEN, 0.5f));
+             DrawText("ZONE 1: STAFF ONLY", 400, 300, 30, Fade(WHITE, 0.1f));
+             DrawText("EXIT", 3200, 300, 40, Fade(GREEN, 0.5f));
         }
 
+        // Enemies
         for (int i = 0; i < currentLevel.enemyCount; i++) {
             if (currentLevel.enemies[i].active) {
-                DrawCircleV(currentLevel.enemies[i].position,
-                            currentLevel.enemies[i].radius,
-                            currentLevel.enemies[i].identity.color);
-                DrawCircleLines((int)currentLevel.enemies[i].position.x,
-                                (int)currentLevel.enemies[i].position.y,
-                                currentLevel.enemies[i].radius + 2, WHITE);
+                DrawCircleV(currentLevel.enemies[i].position, currentLevel.enemies[i].radius, currentLevel.enemies[i].identity.color);
+                DrawCircleLines((int)currentLevel.enemies[i].position.x, (int)currentLevel.enemies[i].position.y, currentLevel.enemies[i].radius + 2, WHITE);
             }
         }
 
+        // Mask
         if (maskActive) {
-            DrawCircleV(droppedMask.position, droppedMask.radius,
-                        droppedMask.identity.color);
-            DrawCircleLines((int)droppedMask.position.x, (int)droppedMask.position.y,
-                            droppedMask.radius + 4, GOLD);
-            DrawText("PRESS SPACE", (int)droppedMask.position.x - 30,
-                     (int)droppedMask.position.y - 30, 10, WHITE);
+            DrawCircleV(droppedMask.position, droppedMask.radius, droppedMask.identity.color);
+            DrawText("PRESS SPACE", (int)droppedMask.position.x - 30, (int)droppedMask.position.y - 30, 10, WHITE);
         }
 
+        // Bullets
         for (int i = 0; i < MAX_BULLETS; i++) {
-            if (bullets[i].active) {
-                DrawCircleV(bullets[i].position, bullets[i].radius,
-                            bullets[i].isPlayerOwned ? YELLOW : ORANGE);
-            }
+            if (bullets[i].active) DrawCircleV(bullets[i].position, bullets[i].radius, bullets[i].isPlayerOwned ? YELLOW : ORANGE);
         }
 
+        // Player
         if (playerRender.loaded) {
             PlayerRender_Draw(&playerRender, &player);
             PlayerRender_DrawMuzzleFlash(&playerRender, &player, weaponShootTimer);
         } else {
-            PlayerRender_DrawFallback(player.position, player.radius);
+            PlayerRender_DrawFallback(player.position, player.radius); // Fallback if not loaded
         }
-        if (meleeTargetIndex >= 0 && meleeTargetIndex < currentLevel.enemyCount &&
-            currentLevel.enemies[meleeTargetIndex].active) {
-            Vector2 promptPos = {
-                currentLevel.enemies[meleeTargetIndex].position.x - meleePromptHorizontalOffset,
-                currentLevel.enemies[meleeTargetIndex].position.y - meleePromptOffset
-            };
-            DrawText("PRESS E TO CHOKE", (int)promptPos.x, (int)promptPos.y, 12, WHITE);
+
+        // Melee Prompt
+        if (meleeTargetIndex >= 0 && meleeTargetIndex < currentLevel.enemyCount && currentLevel.enemies[meleeTargetIndex].active) {
+             DrawText("PRESS E TO CHOKE", (int)player.position.x, (int)player.position.y - 60, 12, WHITE);
         }
+        
+        // Debug
         if (playerDebugDraw) {
-            DrawLineV((Vector2){player.position.x - playerDebugCrossSize, player.position.y},
-                      (Vector2){player.position.x + playerDebugCrossSize, player.position.y}, RED);
-            DrawLineV((Vector2){player.position.x, player.position.y - playerDebugCrossSize},
-                      (Vector2){player.position.x, player.position.y + playerDebugCrossSize}, RED);
-            DrawCircleLines((int)player.position.x, (int)player.position.y, player.radius, GOLD);
+             DrawCircleLines((int)player.position.x, (int)player.position.y, player.radius, GOLD);
         }
-        Vector2 mouseWorld = GetScreenToWorld2D(GetMousePosition(), camera);
-        DrawLineV(player.position, mouseWorld, Fade(WHITE, 0.2f));
+        
         EndMode2D();
-
-    // HUD
-    Hud_DrawPlayer(&player);
+        
+        // HUD
+        Hud_DrawPlayer(&player);
     }
-
     EndDrawing();
 }
 
+
 bool Game_Update(void) {
     if (currentState == STATE_MENU) {
-        return UpdateMenu();
+        UpdateMenu();
     } else {
         UpdateGame(GetFrameTime());
-        return true;
     }
+    return true;
 }
 
 void Game_Draw(void) {
@@ -638,7 +650,12 @@ void Game_Draw(void) {
 
 
 void Game_Shutdown(void) {
-    PlayerRender_Unload(&playerRender);
-    Hud_Shutdown();
+    UnloadTexture(texZone1);
+    UnloadTexture(texZone2);
+    UnloadTexture(texZone3);
+    UnloadTexture(texZone4);
+    UnloadTexture(texZone5);
+    UnloadTexture(texZone6);
+    UnloadTexture(texZone7);
 }
 
