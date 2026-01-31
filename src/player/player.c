@@ -15,7 +15,7 @@ Entity InitPlayer(Vector2 spawnPos, Identity startIdentity) {
   return player;
 }
 
-void UpdatePlayer(Entity *player, Level *currentLevel, float dt) {
+void UpdatePlayer(Entity *player, Level *currentLevel, float dt, bool godMode) {
   Vector2 moveInput = {0};
   if (IsKeyDown(KEY_W))
     moveInput.y -= 1.0f;
@@ -47,12 +47,14 @@ void UpdatePlayer(Entity *player, Level *currentLevel, float dt) {
       }
     }
 
-    for (int i = 0; i < currentLevel->doorCount && !blocked_x; i++) {
-      if (CheckCollisionCircleRec(xPos, player->radius, currentLevel->doors[i])) {
-        if (player->identity.permissionLevel < currentLevel->doorPerms[i]) {
-          blocked_x = true;
+    if (!godMode) {
+        for (int i = 0; i < currentLevel->doorCount && !blocked_x; i++) {
+          if (CheckCollisionCircleRec(xPos, player->radius, currentLevel->doors[i])) {
+            if (player->identity.permissionLevel < currentLevel->doorPerms[i]) {
+              blocked_x = true;
+            }
+          }
         }
-      }
     }
 
     if (!blocked_x) {
@@ -81,12 +83,14 @@ void UpdatePlayer(Entity *player, Level *currentLevel, float dt) {
       }
     }
 
-    for (int i = 0; i < currentLevel->doorCount && !blocked_y; i++) {
-      if (CheckCollisionCircleRec(yPos, player->radius, currentLevel->doors[i])) {
-        if (player->identity.permissionLevel < currentLevel->doorPerms[i]) {
-          blocked_y = true;
+    if (!godMode) {
+        for (int i = 0; i < currentLevel->doorCount && !blocked_y; i++) {
+          if (CheckCollisionCircleRec(yPos, player->radius, currentLevel->doors[i])) {
+            if (player->identity.permissionLevel < currentLevel->doorPerms[i]) {
+              blocked_y = true;
+            }
+          }
         }
-      }
     }
 
     if (!blocked_y) {
