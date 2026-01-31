@@ -20,6 +20,7 @@ typedef struct {
     Rectangle rect;
     PermissionLevel requiredPerm;
     bool isOpen;
+    float animationProgress; // 0.0 = Closed, 1.0 = Fully Open
 } Door;
 
 typedef struct {
