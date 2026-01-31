@@ -836,6 +836,16 @@ static void UpdateGame(float dt) {
                  currentLevel.doors[i].isOpen = false;
             }
         }
+        
+        // Animate
+        float speed = 2.0f; // Opening speed
+        if (currentLevel.doors[i].isOpen) {
+            currentLevel.doors[i].animationProgress += speed * dt;
+            if (currentLevel.doors[i].animationProgress > 1.0f) currentLevel.doors[i].animationProgress = 1.0f;
+        } else {
+            currentLevel.doors[i].animationProgress -= speed * dt;
+            if (currentLevel.doors[i].animationProgress < 0.0f) currentLevel.doors[i].animationProgress = 0.0f;
+        }
     }
 
     // Check Win Condition (Reach Win Area or Enemies Cleared? or Zone 7?)
@@ -853,24 +863,14 @@ static void DrawGame(void) {
     if (gameOver || gameWon) {
         int sw = GetScreenWidth();
         int sh = GetScreenHeight();
-
+        
         if (gameOver) {
             DrawText("GAME OVER", sw / 2 - 100, sh / 2 - 20, 40, RED);
             DrawText("Press R to Restart Level", sw / 2 - 100, sh / 2 + 30, 20, RAYWHITE);
             DrawText("Press M to Menu", sw / 2 - 100, sh / 2 + 60, 20, RAYWHITE);
         } else {
-            DrawText("EPISODE COMPLETE!", sw / 2 - 150, sh / 2 - 20, 40, GOLD);
-            // Player builds: Next + Menu.
-#if !defined(DEV_MODE) || !(DEV_MODE)
-            DrawText("Press N to Next", sw / 2 - 100, sh / 2 + 30, 20, RAYWHITE);
-            DrawText("Press M to Menu", sw / 2 - 100, sh / 2 + 60, 20, RAYWHITE);
-            DrawText("(Saving will be added later)", sw / 2 - 130, sh / 2 + 90, 18, Fade(RAYWHITE, 0.7f));
-#else
-            // Dev builds: Replay still useful.
-            DrawText("Press R to Replay", sw / 2 - 100, sh / 2 + 30, 20, RAYWHITE);
-            DrawText("Press N to Next", sw / 2 - 100, sh / 2 + 60, 20, RAYWHITE);
-            DrawText("Press M to Menu", sw / 2 - 100, sh / 2 + 90, 20, RAYWHITE);
-#endif
+             DrawText("EPISODE COMPLETE!", sw / 2 - 150, sh / 2 - 20, 40, GOLD);
+             DrawText("Press N to Next or R to Replay", sw / 2 - 150, sh / 2 + 30, 20, RAYWHITE);
         }
     } else {
         BeginMode2D(camera);
@@ -884,22 +884,59 @@ static void DrawGame(void) {
         if (playerDebugDraw) {
             for (int i = 0; i < currentLevel.wallCount; i++) DrawRectangleRec(currentLevel.walls[i], Fade(RED, 0.5f));
         }
+        
+        // Draw Doors (Sliding Sci-Fi Style)
         for (int i = 0; i < currentLevel.doorCount; i++) {
+            Door *door = &currentLevel.doors[i];
             Color doorColor = SKYBLUE;
-            if (currentLevel.doors[i].requiredPerm == PERM_STAFF) doorColor = GREEN;
-            else if (currentLevel.doors[i].requiredPerm == PERM_GUARD) doorColor = RED;
-            else if (currentLevel.doors[i].requiredPerm == PERM_ADMIN) doorColor = PURPLE;
-
-            if (!currentLevel.doors[i].isOpen) {
-                DrawRectangleRec(currentLevel.doors[i].rect, Fade(doorColor, 0.6f));
-                DrawRectangleLinesEx(currentLevel.doors[i].rect, 2.0f, WHITE);
+            if (door->requiredPerm == PERM_STAFF) doorColor = GREEN;
+            else if (door->requiredPerm == PERM_GUARD) doorColor = RED;
+            else if (door->requiredPerm == PERM_ADMIN) doorColor = PURPLE;
+            
+            // Determine orientation (Horizontal or Vertical) based on aspect ratio
+            bool isHorizontal = door->rect.width > door->rect.height;
+            
+            float anim = door->animationProgress; // 0..1
+            
+            // Draw Door Panels
+            if (isHorizontal) {
+                // Splits Left/Right
+                float w = door->rect.width / 2.0f;
+                float slideDist = w * anim;
                 
-                // Draw a small lock icon visual (circle)
-                Vector2 center = { currentLevel.doors[i].rect.x + currentLevel.doors[i].rect.width/2, 
-                                   currentLevel.doors[i].rect.y + currentLevel.doors[i].rect.height/2 };
-                DrawCircleV(center, 4.0f, WHITE);
+                Rectangle leftPanel = { door->rect.x - slideDist, door->rect.y, w, door->rect.height };
+                Rectangle rightPanel = { door->rect.x + w + slideDist, door->rect.y, w, door->rect.height };
+                
+                // Draw Panels
+                DrawRectangleRec(leftPanel, Fade(doorColor, 0.8f));
+                DrawRectangleLinesEx(leftPanel, 2.0f, WHITE);
+                
+                DrawRectangleRec(rightPanel, Fade(doorColor, 0.8f));
+                DrawRectangleLinesEx(rightPanel, 2.0f, WHITE);
+                
             } else {
-                DrawRectangleLinesEx(currentLevel.doors[i].rect, 3.0f, Fade(doorColor, 0.5f));
+                // Splits Top/Bottom (Vertical Door)
+                float h = door->rect.height / 2.0f;
+                float slideDist = h * anim;
+                
+                Rectangle topPanel = { door->rect.x, door->rect.y - slideDist, door->rect.width, h };
+                Rectangle bottomPanel = { door->rect.x, door->rect.y + h + slideDist, door->rect.width, h };
+                
+                 // Draw Panels
+                DrawRectangleRec(topPanel, Fade(doorColor, 0.8f));
+                DrawRectangleLinesEx(topPanel, 2.0f, WHITE);
+                
+                DrawRectangleRec(bottomPanel, Fade(doorColor, 0.8f));
+                DrawRectangleLinesEx(bottomPanel, 2.0f, WHITE);
+            }
+            
+            // Draw Lock Icon if closed
+            if (anim < 0.1f) {
+                Vector2 center = { door->rect.x + door->rect.width/2, door->rect.y + door->rect.height/2 };
+                DrawCircleV(center, 4.0f, WHITE);
+                if (door->requiredPerm > PERM_NONE) {
+                     DrawRing(center, 6.0f, 8.0f, 0, 360, 0, doorColor);
+                }
             }
         }
 
