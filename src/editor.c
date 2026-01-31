@@ -75,6 +75,9 @@ void editor_update_state(LevelEditor* ed) {
         ed->state = (ed->state == ED_CLOSED) ? ED_IDLE : ED_CLOSED;
         ed->selected = -1;
     }
+    if (ed->state == ED_CLOSED) {
+        return;
+    }
 
     if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
         ed->state = ED_IDLE;
