@@ -82,40 +82,40 @@ void PlayerRender_LoadEpisodeAssets(PlayerRender *pr) {
         PlayerRender_Unload(pr);
     }
 
-    pr->feetIdleClip = LoadAnimClip("assets/better_character/Top_Down_Survivor/feet/idle", 30.0f);
-    pr->feetWalkClip = LoadAnimClip("assets/better_character/Top_Down_Survivor/feet/walk", 30.0f);
-    pr->feetRunClip = LoadAnimClip("assets/better_character/Top_Down_Survivor/feet/run", 30.0f);
-    pr->feetStrafeLeftClip = LoadAnimClip("assets/better_character/Top_Down_Survivor/feet/strafe_left", 30.0f);
-    pr->feetStrafeRightClip = LoadAnimClip("assets/better_character/Top_Down_Survivor/feet/strafe_right", 30.0f);
+    pr->feetIdleClip = LoadAnimClip("assets/better_character/feet/idle", 30.0f);
+    pr->feetWalkClip = LoadAnimClip("assets/better_character/feet/walk", 30.0f);
+    pr->feetRunClip = LoadAnimClip("assets/better_character/feet/run", 30.0f);
+    pr->feetStrafeLeftClip = LoadAnimClip("assets/better_character/feet/strafe_left", 30.0f);
+    pr->feetStrafeRightClip = LoadAnimClip("assets/better_character/feet/strafe_right", 30.0f);
 
-    pr->handgunIdleClip = LoadAnimClip("assets/better_character/Top_Down_Survivor/handgun/idle", 30.0f);
-    pr->handgunMoveClip = LoadAnimClip("assets/better_character/Top_Down_Survivor/handgun/move", 30.0f);
-    pr->handgunShootClip = LoadAnimClip("assets/better_character/Top_Down_Survivor/handgun/shoot", 60.0f);
-    pr->handgunReloadClip = LoadAnimClip("assets/better_character/Top_Down_Survivor/handgun/reload", 30.0f);
-    pr->handgunMeleeClip = LoadAnimClip("assets/better_character/Top_Down_Survivor/handgun/meleeattack", 30.0f);
+    pr->handgunIdleClip = LoadAnimClip("assets/better_character/handgun/idle", 30.0f);
+    pr->handgunMoveClip = LoadAnimClip("assets/better_character/handgun/move", 30.0f);
+    pr->handgunShootClip = LoadAnimClip("assets/better_character/handgun/shoot", 60.0f);
+    pr->handgunReloadClip = LoadAnimClip("assets/better_character/handgun/reload", 30.0f);
+    pr->handgunMeleeClip = LoadAnimClip("assets/better_character/handgun/meleeattack", 30.0f);
 
-    pr->rifleIdleClip = LoadAnimClip("assets/better_character/Top_Down_Survivor/rifle/idle", 30.0f);
-    pr->rifleMoveClip = LoadAnimClip("assets/better_character/Top_Down_Survivor/rifle/move", 30.0f);
-    pr->rifleShootClip = LoadAnimClip("assets/better_character/Top_Down_Survivor/rifle/shoot", 60.0f);
-    pr->rifleReloadClip = LoadAnimClip("assets/better_character/Top_Down_Survivor/rifle/reload", 30.0f);
-    pr->rifleMeleeClip = LoadAnimClip("assets/better_character/Top_Down_Survivor/rifle/meleeattack", 30.0f);
+    pr->rifleIdleClip = LoadAnimClip("assets/better_character/rifle/idle", 30.0f);
+    pr->rifleMoveClip = LoadAnimClip("assets/better_character/rifle/move", 30.0f);
+    pr->rifleShootClip = LoadAnimClip("assets/better_character/rifle/shoot", 60.0f);
+    pr->rifleReloadClip = LoadAnimClip("assets/better_character/rifle/reload", 30.0f);
+    pr->rifleMeleeClip = LoadAnimClip("assets/better_character/rifle/meleeattack", 30.0f);
 
     // Shotgun placeholder uses rifle clips.
-    pr->shotgunIdleClip = LoadAnimClip("assets/better_character/Top_Down_Survivor/rifle/idle", 30.0f);
-    pr->shotgunMoveClip = LoadAnimClip("assets/better_character/Top_Down_Survivor/rifle/move", 30.0f);
-    pr->shotgunShootClip = LoadAnimClip("assets/better_character/Top_Down_Survivor/rifle/shoot", 60.0f);
-    pr->shotgunReloadClip = LoadAnimClip("assets/better_character/Top_Down_Survivor/rifle/reload", 30.0f);
-    pr->shotgunMeleeClip = LoadAnimClip("assets/better_character/Top_Down_Survivor/rifle/meleeattack", 30.0f);
+    pr->shotgunIdleClip = LoadAnimClip("assets/better_character/rifle/idle", 30.0f);
+    pr->shotgunMoveClip = LoadAnimClip("assets/better_character/rifle/move", 30.0f);
+    pr->shotgunShootClip = LoadAnimClip("assets/better_character/rifle/shoot", 60.0f);
+    pr->shotgunReloadClip = LoadAnimClip("assets/better_character/rifle/reload", 30.0f);
+    pr->shotgunMeleeClip = LoadAnimClip("assets/better_character/rifle/meleeattack", 30.0f);
 
-    pr->flashlightIdleClip = LoadAnimClip("assets/better_character/Top_Down_Survivor/flashlight/idle", 30.0f);
-    pr->flashlightMoveClip = LoadAnimClip("assets/better_character/Top_Down_Survivor/flashlight/move", 30.0f);
-    pr->flashlightMeleeClip = LoadAnimClip("assets/better_character/Top_Down_Survivor/flashlight/meleeattack", 30.0f);
+    pr->flashlightIdleClip = LoadAnimClip("assets/better_character/flashlight/idle", 30.0f);
+    pr->flashlightMoveClip = LoadAnimClip("assets/better_character/flashlight/move", 30.0f);
+    pr->flashlightMeleeClip = LoadAnimClip("assets/better_character/flashlight/meleeattack", 30.0f);
 
-    pr->knifeIdleClip = LoadAnimClip("assets/better_character/Top_Down_Survivor/knife/idle", 30.0f);
-    pr->knifeMoveClip = LoadAnimClip("assets/better_character/Top_Down_Survivor/knife/move", 30.0f);
-    pr->knifeMeleeClip = LoadAnimClip("assets/better_character/Top_Down_Survivor/knife/meleeattack", 30.0f);
+    pr->knifeIdleClip = LoadAnimClip("assets/better_character/knife/idle", 30.0f);
+    pr->knifeMoveClip = LoadAnimClip("assets/better_character/knife/move", 30.0f);
+    pr->knifeMeleeClip = LoadAnimClip("assets/better_character/knife/meleeattack", 30.0f);
 
-    pr->shadow = LoadTexture("assets/character/LightArtilleryRobot/shadow.png");
+    pr->shadow = LoadTexture("assets/better_character/shadow.png");
 
     pr->feetAnim = (AnimPlayer){0};
     pr->weaponAnim = (AnimPlayer){0};
