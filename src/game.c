@@ -631,7 +631,11 @@ static void DrawGame(void) {
 }
 
 
+<<<<<<< HEAD
 bool Game_Update(void) {
+=======
+void Game_Update(void) {
+>>>>>>> 4c44399 (merge)
     if (currentState == STATE_MENU) {
         UpdateMenu();
     } else {
