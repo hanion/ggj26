@@ -50,6 +50,9 @@ typedef struct {
 
     // Shadow texture
     Texture2D shadow;
+    
+    // Muzzle flash texture
+    Texture2D muzzleFlash;
 
     // State
     bool loaded;
@@ -74,5 +77,8 @@ void PlayerRender_OnEquip(PlayerRender *pr, PlayerEquipState equip);
 
 // Draw shadow + feet + weapon at player.position with player.rotation.
 void PlayerRender_Draw(const PlayerRender *pr, const Entity *player);
+
+// Draw muzzle flash when shooting
+void PlayerRender_DrawMuzzleFlash(const PlayerRender *pr, const Entity *player, float weaponShootTimer);
 
 #endif

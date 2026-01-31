@@ -7,7 +7,11 @@ Entity InitPlayer(Vector2 spawnPos, Identity startIdentity) {
                    .identity = startIdentity,
                    .isPlayer = true,
                    .radius = 20.0f,
-                   .shootTimer = 0.0f};
+                   .shootTimer = 0.0f,
+                   .magAmmo = 12,      // Default mag size
+                   .reserveAmmo = 48,  // Default reserve ammo
+                   .isReloading = false,
+                   .reloadTimer = 0.0f};
   return player;
 }
 

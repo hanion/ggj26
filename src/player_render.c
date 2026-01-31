@@ -13,6 +13,7 @@ typedef enum {
     PR_WEAPON_IDLE,
     PR_WEAPON_MOVE,
     PR_WEAPON_SHOOT,
+    PR_WEAPON_RELOAD,
 } PRWeaponState;
 
 static void DrawFrame(Texture2D frame, Vector2 position, float rotation, float scale, Vector2 pivot) {
@@ -42,15 +43,18 @@ static void DrawShadow(Texture2D shadow, Vector2 position, float scale, Vector2 
 static AnimClip *GetWeaponClip(PlayerRender *pr, PlayerEquipState equip, PRWeaponState state) {
     switch (equip) {
         case PLAYER_EQUIP_HANDGUN:
-            return state == PR_WEAPON_SHOOT ? &pr->handgunShootClip :
+            return state == PR_WEAPON_RELOAD ? &pr->handgunReloadClip :
+                   state == PR_WEAPON_SHOOT ? &pr->handgunShootClip :
                    state == PR_WEAPON_MOVE ? &pr->handgunMoveClip :
                                              &pr->handgunIdleClip;
         case PLAYER_EQUIP_RIFLE:
-            return state == PR_WEAPON_SHOOT ? &pr->rifleShootClip :
+            return state == PR_WEAPON_RELOAD ? &pr->rifleReloadClip :
+                   state == PR_WEAPON_SHOOT ? &pr->rifleShootClip :
                    state == PR_WEAPON_MOVE ? &pr->rifleMoveClip :
                                              &pr->rifleIdleClip;
         case PLAYER_EQUIP_SHOTGUN:
-            return state == PR_WEAPON_SHOOT ? &pr->shotgunShootClip :
+            return state == PR_WEAPON_RELOAD ? &pr->shotgunReloadClip :
+                   state == PR_WEAPON_SHOOT ? &pr->shotgunShootClip :
                    state == PR_WEAPON_MOVE ? &pr->shotgunMoveClip :
                                              &pr->shotgunIdleClip;
         case PLAYER_EQUIP_FLASHLIGHT:
@@ -116,6 +120,7 @@ void PlayerRender_LoadEpisodeAssets(PlayerRender *pr) {
     pr->knifeMeleeClip = LoadAnimClip("assets/better_character/knife/meleeattack", 30.0f);
 
     pr->shadow = LoadTexture("assets/better_character/shadow.png");
+    pr->muzzleFlash = LoadTexture("assets/better_character/Survivor Spine/images/muzzle_flash_01-removebg-preview.png");
 
     pr->feetAnim = (AnimPlayer){0};
     pr->weaponAnim = (AnimPlayer){0};
@@ -168,6 +173,11 @@ void PlayerRender_Unload(PlayerRender *pr) {
         UnloadTexture(pr->shadow);
         pr->shadow = (Texture2D){0};
     }
+    
+    if (pr->muzzleFlash.id != 0) {
+        UnloadTexture(pr->muzzleFlash);
+        pr->muzzleFlash = (Texture2D){0};
+    }
 
     pr->loaded = false;
 }
@@ -207,7 +217,9 @@ void PlayerRender_Update(PlayerRender *pr, const Entity *player, float dt, float
 
     // Weapon state
     PRWeaponState nextWeapon = PR_WEAPON_IDLE;
-    if (weaponShootTimer > 0.0f) {
+    if (player->isReloading) {
+        nextWeapon = PR_WEAPON_RELOAD;
+    } else if (weaponShootTimer > 0.0f) {
         nextWeapon = PR_WEAPON_SHOOT;
     } else if (Vector2Length(player->velocity) > 0.01f) {
         nextWeapon = PR_WEAPON_MOVE;
@@ -218,6 +230,8 @@ void PlayerRender_Update(PlayerRender *pr, const Entity *player, float dt, float
         AnimClip *clip = GetWeaponClip(pr, player->equipmentState, pr->weaponState);
         if (clip) {
             AnimPlayer_SetClip(&pr->weaponAnim, clip);
+            // Don't loop reload animation, but loop all others
+            pr->weaponAnim.loop = (nextWeapon != PR_WEAPON_RELOAD);
         }
     }
 
@@ -246,3 +260,39 @@ void PlayerRender_Draw(const PlayerRender *pr, const Entity *player) {
         DrawFrame(weaponFrame, player->position, player->rotation, pr->spriteScale, pr->spritePivot);
     }
 }
+
+// Muzzle flash offset constants (easy to tweak)
+#define MUZZLE_OFFSET_X 40.0f
+#define MUZZLE_OFFSET_Y 16.0f
+
+void PlayerRender_DrawMuzzleFlash(const PlayerRender *pr, const Entity *player, float weaponShootTimer) {
+    if (!pr || !pr->loaded || !player) return;
+    if (pr->muzzleFlash.id == 0) return;
+    if (weaponShootTimer <= 0.0f) return;
+    
+    // Only show muzzle flash for guns
+    if (player->equipmentState != PLAYER_EQUIP_HANDGUN &&
+        player->equipmentState != PLAYER_EQUIP_RIFLE &&
+        player->equipmentState != PLAYER_EQUIP_SHOTGUN) {
+        return;
+    }
+    
+    // Calculate muzzle flash position based on player rotation
+    float rotRad = player->rotation * DEG2RAD;
+    float cosRot = cosf(rotRad);
+    float sinRot = sinf(rotRad);
+    
+    // Apply offset with rotation
+    float offsetX = MUZZLE_OFFSET_X * cosRot - MUZZLE_OFFSET_Y * sinRot;
+    float offsetY = MUZZLE_OFFSET_X * sinRot + MUZZLE_OFFSET_Y * cosRot;
+    
+    Vector2 flashPos = {
+        player->position.x + offsetX,
+        player->position.y + offsetY
+    };
+    
+    // Draw the muzzle flash
+    float flashScale = pr->spriteScale * 0.5f;  // Adjust scale as needed
+    DrawFrame(pr->muzzleFlash, flashPos, player->rotation, flashScale, (Vector2){0.5f, 0.5f});
+}
+
