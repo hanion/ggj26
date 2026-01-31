@@ -1,6 +1,6 @@
-#include "../enemies/enemy.h"
 #include "../types.h"
 #include "episodes.h"
+#include "../enemies/enemy.h" // GetIdentity(), ENEMY_CIVILIAN
 
 // Epilog map bounds in WORLD space.
 // The texture used by game.c is:
@@ -26,58 +26,57 @@ void InitEpisode0(Level *level) {
     level->doorCount = 0;
     level->enemyCount = 0;
 
-    Identity civilianIdentity = GetIdentity(ENEMY_CIVILIAN);
+    // --- Epilog NPCs ---
+    // Must match EPILOG_WORLD_SCALE in game.c
+    const float s = 2.0f;
 
-    level->enemies[level->enemyCount++] = (Entity){
-        .position = {140.0f, 300.0f},
-        .active = true,
-        .isPlayer = false,
-        .isEnemy = false,
-        .isInteractive = true,
-        .npcType = NPC_KIZ,
-        .radius = 20.0f,
-        .identity = civilianIdentity,
-        .aiType = AI_NONE,
-        .state = STATE_IDLE
-    };
+    // Girl (kiz) - interactive NPC
+    {
+        Entity e = (Entity){0};
+        e.position = (Vector2){140.0f * s, 300.0f * s};
+        e.active = true;
+        e.isPlayer = false;
+        e.isEnemy = false;
+        e.isInteractive = true;
+        e.npcType = NPC_KIZ;
+        e.radius = 20.0f;
+        e.aiType = AI_NONE;
+        e.state = STATE_IDLE;
+        if (level->enemyCount < MAX_ENEMIES) {
+            level->enemies[level->enemyCount++] = e;
+        }
+    }
 
-    level->enemies[level->enemyCount++] = (Entity){
-        .position = {210.0f, 330.0f},
-        .active = true,
-        .isPlayer = false,
-        .isEnemy = false,
-        .isInteractive = true,
-        .npcType = NPC_COCUK,
-        .radius = 20.0f,
-        .identity = civilianIdentity,
-        .aiType = AI_NONE,
-        .state = STATE_IDLE
-    };
+    {
+        Entity e = (Entity){0};
+        e.position = (Vector2){740.0f * s, 430.0f * s};
+        e.active = true;
+        e.isPlayer = false;
+        e.isEnemy = false;
+        e.isInteractive = true;
+        e.npcType = NPC_BALIKCI;
+        e.radius = 20.0f;
+        e.aiType = AI_NONE;
+        e.state = STATE_IDLE;
+        if (level->enemyCount < MAX_ENEMIES) {
+            level->enemies[level->enemyCount++] = e;
+        }
+    }
 
-    level->enemies[level->enemyCount++] = (Entity){
-        .position = {740.0f, 430.0f},
-        .active = true,
-        .isPlayer = false,
-        .isEnemy = false,
-        .isInteractive = true,
-        .npcType = NPC_BALIKCI,
-        .radius = 20.0f,
-        .identity = civilianIdentity,
-        .aiType = AI_NONE,
-        .state = STATE_IDLE
-    };
-
-    level->enemies[level->enemyCount++] = (Entity){
-        .position = {820.0f, 760.0f},
-        .active = true,
-        .isPlayer = false,
-        .isEnemy = false,
-        .isInteractive = true,
-        .npcType = NPC_SIGARACI,
-        .radius = 20.0f,
-        .identity = civilianIdentity,
-        .aiType = AI_NONE,
-        .state = STATE_IDLE
-    };
+    {
+        Entity e = (Entity){0};
+        e.position = (Vector2){820.0f * s, 760.0f * s};
+        e.active = true;
+        e.isPlayer = false;
+        e.isEnemy = false;
+        e.isInteractive = true;
+        e.npcType = NPC_SIGARACI;
+        e.radius = 20.0f;
+        e.aiType = AI_NONE;
+        e.state = STATE_IDLE;
+        if (level->enemyCount < MAX_ENEMIES) {
+            level->enemies[level->enemyCount++] = e;
+        }
+    }
 
 }

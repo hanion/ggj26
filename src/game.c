@@ -24,6 +24,7 @@
 #include "player/player_render.h"
 #include "ui/hud.h"
 #include "types.h"
+#include "anim.h"
 
 // Game Constants
 #define MAX_BULLETS 100
@@ -86,6 +87,28 @@ static Texture2D texZone7;
 // Epilog map
 static Texture2D texEpilogMap;
 static const float EPILOG_WORLD_SCALE = 2.0f;
+
+// Epilog NPC animations
+// Replace manual frame arrays with AnimClip so it matches the rest of the project's animation system.
+static AnimClip animKizIdle = {0};
+static bool animKizIdleLoaded = false;
+static AnimPlayer animPlayerKiz = {0};
+static bool animPlayerKizInit = false;
+
+static AnimClip animSigaraciIdle = {0};
+static bool animSigaraciIdleLoaded = false;
+static AnimPlayer animPlayerSigaraci = {0};
+static bool animPlayerSigaraciInit = false;
+
+static AnimClip animBalikciIdle = {0};
+static bool animBalikciIdleLoaded = false;
+static AnimPlayer animPlayerBalikci = {0};
+static bool animPlayerBalikciInit = false;
+
+static const float KIZ_IDLE_FPS = 6.0f;
+static const float SIGARACI_IDLE_FPS = 6.0f;
+static const float BALIKCI_IDLE_FPS = 6.0f;
+static const float EPILOG_NPC_SCALE = 0.35f;
 
 // --- RENDER & GAMEPLAY STATES ---
 static PlayerRender playerRender;
@@ -227,6 +250,46 @@ void StartLevel(int id) {
 
     // Load Textures
     if (texEpilogMap.id == 0) texEpilogMap = LoadTexture("assets/map/prolog/epilog_map.png");
+
+    // Only load Epilog NPC animation when entering Epilog.
+    if (id == 0) {
+        if (!animKizIdleLoaded) {
+            animKizIdle = LoadAnimClip("assets/street_animation/kiz_cocuk", KIZ_IDLE_FPS);
+            animKizIdleLoaded = true;
+        }
+        if (animKizIdleLoaded) {
+            AnimPlayer_SetClip(&animPlayerKiz, &animKizIdle);
+            animPlayerKiz.loop = true;
+            animPlayerKiz.frame_index = 0;
+            animPlayerKiz.time = 0.0f;
+            animPlayerKizInit = true;
+        }
+
+        if (!animSigaraciIdleLoaded) {
+            animSigaraciIdle = LoadAnimClip("assets/street_animation/sigaraci", SIGARACI_IDLE_FPS);
+            animSigaraciIdleLoaded = true;
+        }
+        if (animSigaraciIdleLoaded) {
+            AnimPlayer_SetClip(&animPlayerSigaraci, &animSigaraciIdle);
+            animPlayerSigaraci.loop = true;
+            animPlayerSigaraci.frame_index = 0;
+            animPlayerSigaraci.time = 0.0f;
+            animPlayerSigaraciInit = true;
+        }
+
+        if (!animBalikciIdleLoaded) {
+            animBalikciIdle = LoadAnimClip("assets/street_animation/balikci", BALIKCI_IDLE_FPS);
+            animBalikciIdleLoaded = true;
+        }
+        if (animBalikciIdleLoaded) {
+            AnimPlayer_SetClip(&animPlayerBalikci, &animBalikciIdle);
+            animPlayerBalikci.loop = true;
+            animPlayerBalikci.frame_index = 0;
+            animPlayerBalikci.time = 0.0f;
+            animPlayerBalikciInit = true;
+        }
+    }
+
     if (texZone1.id == 0)texZone1 = LoadTexture("assets/environment/background_1.png");
     if (texZone2.id == 0)texZone2 = LoadTexture("assets/environment/background_2.png");
     if (texZone3.id == 0)texZone3 = LoadTexture("assets/environment/background_3.png");
@@ -342,77 +405,45 @@ static PlayerEquipState MapGunToEquip(GunType type) {
 }
 
 static void UpdateGame(float dt) {
-	camera.offset = (Vector2){ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f };
-	float scale_x = GetScreenWidth()  / 1920.0f;
-	float scale_y = GetScreenHeight() / 1080.0f;
-	camera.zoom = 1.5f*fminf(scale_x, scale_y);
+    camera.offset = (Vector2){ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f };
+    float scale_x = GetScreenWidth()  / 1920.0f;
+    float scale_y = GetScreenHeight() / 1080.0f;
+    camera.zoom = 1.5f*fminf(scale_x, scale_y);
 
+    if (IsKeyPressed(KEY_F1)) playerDebugDraw = !playerDebugDraw;
+    if (IsKeyPressed(KEY_F)) developerMode = !developerMode;
 
-    // Debug Toggle F1
-    if (IsKeyPressed(KEY_F1)) {
-        playerDebugDraw = !playerDebugDraw;
-    }
-    
-    // Developer Mode Toggle F
-    if (IsKeyPressed(KEY_F)) {
-        developerMode = !developerMode;
-    }
-
-    // Game Over / Win Logic Inputs
     if (gameOver || gameWon) {
-        // GAME OVER
         if (gameOver) {
-            if (IsKeyPressed(KEY_R)) {
-                StartLevel(currentLevel.id); // Restart current level
-            }
-            if (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_SPACE)) {
-                currentState = STATE_MENU; // Return to menu
-            }
+            if (IsKeyPressed(KEY_R)) StartLevel(currentLevel.id);
+            if (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_SPACE)) currentState = STATE_MENU;
             return;
         }
-
-        // WIN
         if (gameWon) {
-            // Update progress context (used by Continue / Next).
             gameCtx.hasWonLastEpisode = true;
             GameContext_SaveFromPlayer(&gameCtx, &player);
-            // Story progression order: 0 (Epilog) -> 1 -> 2
             if (currentLevel.id == 0) gameCtx.nextEpisodeId = 1;
             if (currentLevel.id == 1) gameCtx.nextEpisodeId = 2;
 
-            // Player builds: Next or Menu.
-#if !defined(DEV_MODE) || !(DEV_MODE)
-            if (IsKeyPressed(KEY_N)) {
-                StartLevel(gameCtx.nextEpisodeId);
-                return;
-            }
-            if (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_SPACE)) {
-                currentState = STATE_MENU;
-                return;
-            }
-#else
-            // Dev builds: Replay, Next, or Menu.
-            if (IsKeyPressed(KEY_R)) {
-                StartLevel(currentLevel.id);
-                return;
-            }
-            if (IsKeyPressed(KEY_N)) {
-                StartLevel(gameCtx.nextEpisodeId);
-                return;
-            }
-            if (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_SPACE)) {
-                currentState = STATE_MENU;
-                return;
-            }
+            if (IsKeyPressed(KEY_N)) { StartLevel(gameCtx.nextEpisodeId); return; }
+            if (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_SPACE)) { currentState = STATE_MENU; return; }
+#if defined(DEV_MODE) && (DEV_MODE)
+            if (IsKeyPressed(KEY_R)) { StartLevel(currentLevel.id); return; }
 #endif
         }
         return;
     }
 
-    // Level Start Countdown
     if (levelStartTimer > 0) {
         levelStartTimer -= dt;
-        return; // Don't update player or enemies yet
+        return;
+    }
+
+    // Epilog NPC animation tick
+    if (currentLevel.id == 0) {
+        if (animPlayerKizInit) AnimPlayer_Update(&animPlayerKiz, dt);
+        if (animPlayerSigaraciInit) AnimPlayer_Update(&animPlayerSigaraci, dt);
+        if (animPlayerBalikciInit) AnimPlayer_Update(&animPlayerBalikci, dt);
     }
     
     // --- INVENTORY INPUTS ---
@@ -552,7 +583,7 @@ static void UpdateGame(float dt) {
         } else if (currentGun->type == GUN_KNIFE && weaponShootTimer <= 0) {
              // Knife attack (visual only here, logic is melee below)
              weaponShootTimer = currentGun->cooldown; 
-        }
+    }
     }
 
     // 3. Melee Logic (Knife / Stealth Kill)
@@ -640,7 +671,7 @@ static void UpdateGame(float dt) {
                 if (currentLevel.enemies[e].active && currentLevel.enemies[e].isEnemy) {
                     if (CheckCollisionCircles(bullets[i].position, bullets[i].radius, currentLevel.enemies[e].position, currentLevel.enemies[e].radius)) {
                         // Kill Enemy
-                        PlayerActions_HandleEnemyKilled(&currentLevel, e, &player, droppedMasks, MAX_MASKS, droppedMaskRadius, droppedCards, MAX_CARDS, droppedGuns, MAX_DROPPED_GUNS);
+                    PlayerActions_HandleEnemyKilled(&currentLevel, e, &player, droppedMasks, MAX_MASKS, droppedMaskRadius, droppedCards, MAX_CARDS, droppedGuns, MAX_DROPPED_GUNS);
                         bullets[i].active = false;
                         break;
                     }
@@ -654,7 +685,7 @@ static void UpdateGame(float dt) {
                     gameOver = true; 
                     bullets[i].active = false;
                 }
-            }
+    }
         }
     }
 
@@ -828,251 +859,116 @@ static void DrawGame(void) {
     ClearBackground((Color){20, 20, 25, 255});
 
     if (gameOver || gameWon) {
-        int sw = GetScreenWidth();
-        int sh = GetScreenHeight();
-
+        int sw = GetScreenWidth(); int sh = GetScreenHeight();
         if (gameOver) {
-            DrawText("GAME OVER", sw / 2 - 100, sh / 2 - 20, 40, RED);
-            DrawText("Press R to Restart Level", sw / 2 - 100, sh / 2 + 30, 20, RAYWHITE);
-            DrawText("Press M to Menu", sw / 2 - 100, sh / 2 + 60, 20, RAYWHITE);
+            DrawText("GAME OVER", sw/2 - 100, sh/2 - 20, 40, RED);
+            DrawText("Press R to Restart", sw/2 - 100, sh/2 + 30, 20, RAYWHITE);
         } else {
-            DrawText("EPISODE COMPLETE!", sw / 2 - 150, sh / 2 - 20, 40, GOLD);
-            // Player builds: Next + Menu.
-#if !defined(DEV_MODE) || !(DEV_MODE)
-            DrawText("Press N to Next", sw / 2 - 100, sh / 2 + 30, 20, RAYWHITE);
-            DrawText("Press M to Menu", sw / 2 - 100, sh / 2 + 60, 20, RAYWHITE);
-            DrawText("(Saving will be added later)", sw / 2 - 130, sh / 2 + 90, 18, Fade(RAYWHITE, 0.7f));
-#else
-            // Dev builds: Replay still useful.
-            DrawText("Press R to Replay", sw / 2 - 100, sh / 2 + 30, 20, RAYWHITE);
-            DrawText("Press N to Next", sw / 2 - 100, sh / 2 + 60, 20, RAYWHITE);
-            DrawText("Press M to Menu", sw / 2 - 100, sh / 2 + 90, 20, RAYWHITE);
-#endif
+            DrawText("EPISODE COMPLETE!", sw/2 - 150, sh/2 - 20, 40, GOLD);
+            DrawText("Press N for Next Episode", sw/2 - 100, sh/2 + 30, 20, RAYWHITE);
         }
     } else {
         BeginMode2D(camera);
 
-        if (currentLevel.id == 0) {
-            if (texEpilogMap.id != 0) {
-                DrawTextureEx(texEpilogMap, (Vector2){0, 0}, 0.0f, EPILOG_WORLD_SCALE, WHITE);
-            }
-        } else {
+        if (currentLevel.id == 0 && texEpilogMap.id != 0) {
+            DrawTextureEx(texEpilogMap, (Vector2){0, 0}, 0.0f, EPILOG_WORLD_SCALE, WHITE);
+        }
 
-            // Zone 1
+        // Epilog NPCs
+        if (currentLevel.id == 0) {
+            for (int i = 0; i < currentLevel.enemyCount; i++) {
+                Entity *e = &currentLevel.enemies[i];
+                if (!e->active || e->isEnemy || !e->isInteractive || e->state != STATE_IDLE) continue;
+                if (e->npcType == NPC_KIZ && animPlayerKizInit) DrawAnimPlayer(&animPlayerKiz, e->position, EPILOG_NPC_SCALE, WHITE);
+                if (e->npcType == NPC_SIGARACI && animPlayerSigaraciInit) DrawAnimPlayer(&animPlayerSigaraci, e->position, EPILOG_NPC_SCALE, WHITE);
+                if (e->npcType == NPC_BALIKCI && animPlayerBalikciInit) DrawAnimPlayer(&animPlayerBalikci, e->position, EPILOG_NPC_SCALE, WHITE);
+            }
+        }
+
+        // Zone backgrounds for Episode 1+
+        if (currentLevel.id != 0) {
             DrawTexturePro(texZone1, (Rectangle){0,0,texZone1.width,texZone1.height}, (Rectangle){0,0,913,642}, (Vector2){0,0}, 0.f, WHITE);
-            // Zone 2
             DrawTexturePro(texZone2, (Rectangle){0,0,texZone2.width,texZone2.height}, (Rectangle){913,0,911,661}, (Vector2){0,0}, 0.f, WHITE);
-            // Zone 3
             DrawTexturePro(texZone3, (Rectangle){0,0,texZone3.width,texZone3.height}, (Rectangle){1824,0,957,654}, (Vector2){0,0}, 0.f, WHITE);
-            // Zone 4
             DrawTexturePro(texZone4, (Rectangle){0,0,texZone4.width,texZone4.height}, (Rectangle){1824,654,869,645}, (Vector2){0,0}, 0.f, WHITE);
-            // Zone 5
             DrawTexturePro(texZone5, (Rectangle){0,0,texZone5.width,texZone5.height}, (Rectangle){957,654,867,649}, (Vector2){0,0}, 0.f, WHITE);
-            // Zone 6
             DrawTexturePro(texZone6, (Rectangle){0,0,texZone6.width,texZone6.height}, (Rectangle){162,654,795,853}, (Vector2){0,0}, 0.f, WHITE);
-            // Zone 7
             DrawTexturePro(texZone7, (Rectangle){0,0,texZone7.width,texZone7.height}, (Rectangle){162,1507,795,805}, (Vector2){0,0}, 0.f, WHITE);
         }
 
-        // Draw Level Elements
         if (playerDebugDraw) {
             for (int i = 0; i < currentLevel.wallCount; i++) DrawRectangleRec(currentLevel.walls[i], Fade(RED, 0.5f));
         }
-        for (int i = 0; i < currentLevel.doorCount; i++) {
-            Color doorColor = SKYBLUE;
-            if (currentLevel.doorPerms[i] == PERM_STAFF) doorColor = GREEN;
-            else if (currentLevel.doorPerms[i] == PERM_GUARD) doorColor = RED;
-            else if (currentLevel.doorPerms[i] == PERM_ADMIN) doorColor = PURPLE;
 
+        for (int i = 0; i < currentLevel.doorCount; i++) {
+            Color doorColor = currentLevel.doorPerms[i] == PERM_STAFF ? GREEN : (currentLevel.doorPerms[i] == PERM_GUARD ? RED : SKYBLUE);
             if (!currentLevel.doorsOpen[i]) {
                 DrawRectangleRec(currentLevel.doors[i], Fade(doorColor, 0.6f));
                 DrawRectangleLinesEx(currentLevel.doors[i], 2.0f, WHITE);
-                
-                // Draw a small lock icon visual (circle)
-                Vector2 center = { currentLevel.doors[i].x + currentLevel.doors[i].width/2, 
-                                   currentLevel.doors[i].y + currentLevel.doors[i].height/2 };
-                DrawCircleV(center, 4.0f, WHITE);
             } else {
                 DrawRectangleLinesEx(currentLevel.doors[i], 3.0f, Fade(doorColor, 0.5f));
             }
         }
 
-
-        if (currentLevel.id == 1) {
-             DrawText("ZONE 1: STAFF ONLY", 400, 300, 30, Fade(WHITE, 0.1f));
-             // Animated "EXIT" Text
-             float time = (float)GetTime();
-             float rotation = sinf(time * 2.0f) * 10.0f; // Rock back and forth +/- 10 degrees
-             float scale = 1.0f + sinf(time * 5.0f) * 0.1f; // Pulse scale
-             
-             // Burning/Flashing Color
-             Color c1 = ORANGE;
-             Color c2 = RED;
-             float t = (sinf(time * 8.0f) + 1.0f) / 2.0f;
-             Color burnColor = (Color){
-                (unsigned char)(c1.r + t*(c2.r - c1.r)),
-                (unsigned char)(c1.g + t*(c2.g - c1.g)),
-                (unsigned char)(c1.b + t*(c2.b - c1.b)),
-                255
-             };
-
-             Vector2 textSize = MeasureTextEx(GetFontDefault(), "EXIT", 40, 4);
-             Vector2 origin = { textSize.x / 2, textSize.y / 2 };
-             DrawTextPro(GetFontDefault(), "EXIT", (Vector2){480 + origin.x, 2340 + origin.y}, origin, rotation, 40 * scale, 4, burnColor);
-        }
-
-        // Enemies / NPCs
         for (int i = 0; i < currentLevel.enemyCount; i++) {
-            if (currentLevel.enemies[i].active) {
-                // Draw Vision Cone
-                if (currentLevel.enemies[i].isEnemy) {
-                    float halfAngle = currentLevel.enemies[i].sightAngle / 2.0f;
-                    Vector2 origin = currentLevel.enemies[i].position;
-                    float startAngle = currentLevel.enemies[i].rotation - halfAngle;
-                    float endAngle = currentLevel.enemies[i].rotation + halfAngle;
-                    int segments = 30; 
-                    float step = (endAngle - startAngle) / segments;
-                    
-                    rlSetTexture(0);
-                    rlDisableBackfaceCulling(); // Ensure we see it regardless of winding
-                    rlBegin(RL_TRIANGLES);
-                    rlColor4ub(200, 200, 200, 60); // Light Gray, Semi-transparent
+            Entity *e = &currentLevel.enemies[i];
+            if (!e->active) continue;
+            if (currentLevel.id == 0 && !e->isEnemy && e->isInteractive) continue;
 
-                    for (int s = 0; s < segments; s++) {
-                        float a1 = (startAngle + s * step) * DEG2RAD;
-                        float a2 = (startAngle + (s + 1) * step) * DEG2RAD;
-
-                        Vector2 d1 = { cosf(a1) * currentLevel.enemies[i].sightRange, sinf(a1) * currentLevel.enemies[i].sightRange };
-                        Vector2 d2 = { cosf(a2) * currentLevel.enemies[i].sightRange, sinf(a2) * currentLevel.enemies[i].sightRange };
-
-                        Vector2 p1 = Vector2Add(origin, d1);
-                        Vector2 p2 = Vector2Add(origin, d2);
-                        
-                        // Raycast against walls
-                        p1 = Gameplay_GetRayHit(origin, p1, &currentLevel);
-                        p2 = Gameplay_GetRayHit(origin, p2, &currentLevel);
-
-                        // Draw Triangle (Origin -> P1 -> P2)
-                        rlVertex2f(origin.x, origin.y);
-                        rlVertex2f(p1.x, p1.y);
-                        rlVertex2f(p2.x, p2.y);
-                        
-                        // Draw Backface just in case
-                        rlVertex2f(origin.x, origin.y);
-                        rlVertex2f(p2.x, p2.y);
-                        rlVertex2f(p1.x, p1.y);
-                    }
-                    rlEnd();
-                    rlEnableBackfaceCulling(); // Reset default (though usually off in 2D)
+            if (e->isEnemy) {
+                float halfAngle = e->sightAngle / 2.0f;
+                Vector2 origin = e->position;
+                float startAngle = e->rotation - halfAngle;
+                float endAngle = e->rotation + halfAngle;
+                int segments = 30;
+                float step = (endAngle - startAngle) / segments;
+                rlSetTexture(0); rlBegin(RL_TRIANGLES); rlColor4ub(200, 200, 200, 60);
+                for (int s = 0; s < segments; s++) {
+                    float a1 = (startAngle + s * step) * DEG2RAD;
+                    float a2 = (startAngle + (s + 1) * step) * DEG2RAD;
+                    Vector2 p1 = Vector2Add(origin, (Vector2){ cosf(a1)*e->sightRange, sinf(a1)*e->sightRange });
+                    Vector2 p2 = Vector2Add(origin, (Vector2){ cosf(a2)*e->sightRange, sinf(a2)*e->sightRange });
+                    p1 = Gameplay_GetRayHit(origin, p1, &currentLevel);
+                    p2 = Gameplay_GetRayHit(origin, p2, &currentLevel);
+                    rlVertex2f(origin.x, origin.y); rlVertex2f(p1.x, p1.y); rlVertex2f(p2.x, p2.y);
                 }
-
-                DrawCircleV(currentLevel.enemies[i].position, currentLevel.enemies[i].radius, currentLevel.enemies[i].identity.color);
-                DrawCircleLines((int)currentLevel.enemies[i].position.x, (int)currentLevel.enemies[i].position.y, currentLevel.enemies[i].radius + 2, WHITE);
+                rlEnd();
             }
+
+            DrawCircleV(e->position, e->radius, e->identity.color);
+            DrawCircleLines((int)e->position.x, (int)e->position.y, e->radius + 2, WHITE);
         }
 
-        // Mask
-        for (int i = 0; i < MAX_MASKS; i++) {
-            if (droppedMasks[i].active) {
-                DrawCircleV(droppedMasks[i].position, droppedMasks[i].radius, droppedMasks[i].identity.color);
-                DrawText("MASK", (int)droppedMasks[i].position.x - 10, (int)droppedMasks[i].position.y - 10, 8, WHITE);
-                DrawText("PRESS SPACE", (int)droppedMasks[i].position.x - 30, (int)droppedMasks[i].position.y - 30, 10, WHITE);
-            }
+        for (int i = 0; i < MAX_MASKS; i++) if (droppedMasks[i].active) {
+            DrawCircleV(droppedMasks[i].position, 10, droppedMasks[i].identity.color);
+            DrawText("MASK", (int)droppedMasks[i].position.x - 10, (int)droppedMasks[i].position.y - 10, 8, WHITE);
         }
-
-        // Cards
-        for (int i = 0; i < MAX_CARDS; i++) {
-            if (droppedCards[i].active) {
-                // Draw a rectangle card
-                Rectangle cardRect = { droppedCards[i].position.x - 8, droppedCards[i].position.y - 5, 16, 10 };
-                DrawRectangleRec(cardRect, droppedCards[i].identity.color);
-                DrawRectangleLinesEx(cardRect, 1, WHITE);
-                DrawText("CARD", (int)droppedCards[i].position.x - 10, (int)droppedCards[i].position.y - 15, 8, WHITE);
-            }
+        for (int i = 0; i < MAX_CARDS; i++) if (droppedCards[i].active) {
+            Rectangle cardRect = { droppedCards[i].position.x - 8, droppedCards[i].position.y - 5, 16, 10 };
+            DrawRectangleRec(cardRect, droppedCards[i].identity.color);
+            DrawRectangleLinesEx(cardRect, 1, WHITE);
         }
-
-        // Dropped Guns
-        for (int i = 0; i < MAX_DROPPED_GUNS; i++) {
-            if (droppedGuns[i].active) {
-                // Determine text/color
-                Color gunCol = ORANGE;
-                const char* txt = "GUN";
-                if (droppedGuns[i].gun.type == GUN_HANDGUN) { txt = "Pistol"; gunCol = GOLD; }
-                else if (droppedGuns[i].gun.type == GUN_RIFLE) { txt = "Rifle"; gunCol = LIME; }
-                
-                DrawCircleV(droppedGuns[i].position, droppedGuns[i].radius, gunCol);
-                DrawText(txt, (int)droppedGuns[i].position.x - 20, (int)droppedGuns[i].position.y - 20, 10, WHITE);
-            }
+        for (int i = 0; i < MAX_DROPPED_GUNS; i++) if (droppedGuns[i].active) {
+            DrawCircleV(droppedGuns[i].position, 15, ORANGE);
+            DrawText("GUN", (int)droppedGuns[i].position.x - 10, (int)droppedGuns[i].position.y - 10, 10, WHITE);
         }
+        for (int i = 0; i < MAX_BULLETS; i++) if (bullets[i].active) DrawCircleV(bullets[i].position, BULLET_RADIUS, bullets[i].isPlayerOwned ? YELLOW : ORANGE);
 
-        // Bullets
-        for (int i = 0; i < MAX_BULLETS; i++) {
-            if (bullets[i].active) DrawCircleV(bullets[i].position, bullets[i].radius, bullets[i].isPlayerOwned ? YELLOW : ORANGE);
-        }
-
-        // Player
         if (playerRender.loaded) {
             PlayerRender_Draw(&playerRender, &player, lastEquipmentState);
             PlayerRender_DrawMuzzleFlash(&playerRender, &player, lastEquipmentState, weaponShootTimer);
-        } else {
-            PlayerRender_DrawFallback(player.position, player.radius); // Fallback if not loaded
         }
+        if (meleeTargetIndex != -1) DrawText("PRESS E TO CHOKE", (int)player.position.x, (int)player.position.y - 60, 12, WHITE);
+        if (npcPromptIndex != -1) DrawText("PRESS E", (int)(currentLevel.enemies[npcPromptIndex].position.x - 25), (int)(currentLevel.enemies[npcPromptIndex].position.y - 30), 12, WHITE);
 
-        // Melee Prompt
-        if (meleeTargetIndex >= 0 && meleeTargetIndex < currentLevel.enemyCount && currentLevel.enemies[meleeTargetIndex].active) {
-             DrawText("PRESS E TO CHOKE", (int)player.position.x, (int)player.position.y - 60, 12, WHITE);
-        }
-
-        // NPC Prompt & Feedback
-        if (npcPromptIndex >= 0 && npcPromptIndex < currentLevel.enemyCount &&
-            currentLevel.enemies[npcPromptIndex].active && currentLevel.enemies[npcPromptIndex].isInteractive) {
-            Vector2 npcPos = currentLevel.enemies[npcPromptIndex].position;
-            DrawText("PRESS E", (int)(npcPos.x - npcPromptHorizontalOffset), (int)(npcPos.y - npcPromptVerticalOffset), 12, WHITE);
-        }
-
-        if (npcInteractionIndex >= 0 && npcInteractionIndex < currentLevel.enemyCount &&
-            currentLevel.enemies[npcInteractionIndex].active && currentLevel.enemies[npcInteractionIndex].isInteractive) {
-            const char *npcLabel = "NPC";
-            switch (currentLevel.enemies[npcInteractionIndex].npcType) {
-                case NPC_KIZ:
-                    npcLabel = "KIZ";
-                    break;
-                case NPC_COCUK:
-                    npcLabel = "COCUK";
-                    break;
-                case NPC_BALIKCI:
-                    npcLabel = "BALIKCI";
-                    break;
-                case NPC_SIGARACI:
-                    npcLabel = "SIGARACI";
-                    break;
-                default:
-                    break;
-            }
-            Vector2 npcPos = currentLevel.enemies[npcInteractionIndex].position;
-            DrawText(npcLabel, (int)(npcPos.x - npcLabelHorizontalOffset), (int)(npcPos.y - npcLabelVerticalOffset), 12, WHITE);
-        }
-        
-        // Debug
-        if (playerDebugDraw) {
-             DrawCircleLines((int)player.position.x, (int)player.position.y, player.radius, GOLD);
-        }
-        
         EndMode2D();
-    // HUD
-    Hud_DrawPlayer(&player);
+    }
 
-    if (levelStartTimer > 0) {
-        DrawText("READY...", GetScreenWidth()/2 - 50, GetScreenHeight()/2, 30, RED);
-    }
-    
-    if (developerMode) {
-        DrawText("DEV MODE ON (F) - GOD & UNLOCK", 10, 10, 20, GREEN);
-    }
-    }
+    Hud_DrawPlayer(&player);
+    if (currentLevel.id == 0) DrawText(TextFormat("KIZ: %d, SIG: %d, BAL: %d", animPlayerKiz.frame_index, animPlayerSigaraci.frame_index, animPlayerBalikci.frame_index), 10, 40, 18, RAYWHITE);
+    if (levelStartTimer > 0) DrawText("READY...", GetScreenWidth()/2 - 50, GetScreenHeight()/2, 30, RED);
     EndDrawing();
 }
-
 
 bool Game_Update(void) {
     if (currentState == STATE_MENU) {
@@ -1091,7 +987,6 @@ void Game_Draw(void) {
     }
 }
 
-
 void Game_Shutdown(void) {
     UnloadTexture(texZone1);
     UnloadTexture(texZone2);
@@ -1101,4 +996,21 @@ void Game_Shutdown(void) {
     UnloadTexture(texZone6);
     UnloadTexture(texZone7);
     if (texEpilogMap.id != 0) UnloadTexture(texEpilogMap);
+    if (animKizIdleLoaded) {
+        UnloadAnimClip(&animKizIdle);
+        animKizIdleLoaded = false;
+    }
+    animPlayerKizInit = false;
+
+    if (animSigaraciIdleLoaded) {
+        UnloadAnimClip(&animSigaraciIdle);
+        animSigaraciIdleLoaded = false;
+    }
+    animPlayerSigaraciInit = false;
+
+    if (animBalikciIdleLoaded) {
+        UnloadAnimClip(&animBalikciIdle);
+        animBalikciIdleLoaded = false;
+    }
+    animPlayerBalikciInit = false;
 }
