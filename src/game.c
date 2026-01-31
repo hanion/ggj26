@@ -14,6 +14,10 @@
 #include "player/player_render.h"
 #include "types.h"
 
+#include "game_context.h"
+
+#include "player/player_actions.h"
+
 #include "ui/hud.h"
 
 // Game Constants
@@ -39,6 +43,8 @@ static GameState currentState;
 static Level currentLevel;
 static bool gameOver; 
 static bool gameWon; 
+
+static GameContext gameCtx;
 
 static Entity player;
 static Camera2D camera;
@@ -66,103 +72,20 @@ static PlayerEquipState lastEquipmentState;
 
 // HUD is implemented in ui/hud.c now.
 
-static void DrawPlayerFallback(Vector2 position, float radius) {
-    float size = radius * 2.0f;
-    DrawRectangleV((Vector2){position.x - radius, position.y - radius},
-                   (Vector2){size, size}, RED);
-}
-
-static void UpdatePlayerPivotFromFrame(Texture2D frame) {
-    if (playerFramePivotReady || frame.id == 0) {
-        return;
-    }
-    Image image = LoadImageFromTexture(frame);
-    if (image.data == NULL) {
-        TraceLog(LOG_WARNING, "Failed to read player frame for pivot");
-        return;
-    }
-    if (image.format != PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) {
-        ImageFormat(&image, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8);
-    }
-    unsigned char *pixels = (unsigned char *)image.data;
-    int minX = image.width;
-    int maxX = -1;
-    int minY = image.height;
-    int maxY = -1;
-    bool found = false;
-
-    for (int y = 0; y < image.height; y++) {
-        for (int x = 0; x < image.width; x++) {
-            int index = (y * image.width + x) * 4 + 3;
-            unsigned char alpha = pixels[index];
-            if (alpha > playerPivotAlphaThreshold) {
-                if (x < minX) minX = x;
-                if (x > maxX) maxX = x;
-                if (y < minY) minY = y;
-                if (y > maxY) maxY = y;
-                found = true;
-            }
-        }
-    }
-
-    if (found) {
-        float centerX = (minX + maxX) * 0.5f;
-        float centerY = (minY + maxY) * 0.5f;
-        playerFramePivot = (Vector2){centerX / (float)image.width,
-                                     centerY / (float)image.height};
-        playerFramePivotReady = true;
-    } else {
-        TraceLog(LOG_WARNING, "Player frame had no opaque pixels for pivot");
-    }
-    UnloadImage(image);
-}
-
-static int GetClosestEnemyInRange(Vector2 position, float range) {
-    float closestDist = range;
-    int closestIndex = -1;
-    for (int i = 0; i < currentLevel.enemyCount; i++) {
-        if (!currentLevel.enemies[i].active) {
-            continue;
-        }
-        float dist = Vector2Distance(position, currentLevel.enemies[i].position);
-        if (dist <= closestDist) {
-            closestDist = dist;
-            closestIndex = i;
-        }
-    }
-    return closestIndex;
-}
-
-static void HandleEnemyKilled(int enemyIndex) {
-    if (enemyIndex < 0 || enemyIndex >= currentLevel.enemyCount) {
-        return;
-    }
-    if (!currentLevel.enemies[enemyIndex].active) {
-        return;
-    }
-    currentLevel.enemies[enemyIndex].active = false;
-    maskActive = true;
-    droppedMask.identity = currentLevel.enemies[enemyIndex].identity;
-    droppedMask.position = currentLevel.enemies[enemyIndex].position;
-    droppedMask.radius = droppedMaskRadius;
-    droppedMask.active = true;
-    // Auto-equip handgun after a kill (so player can shoot instead of staying on knife).
-    // If you later add actual weapon pickups, move this to that pickup logic instead.
-    if (player.equipmentState == PLAYER_EQUIP_KNIFE || player.equipmentState == PLAYER_EQUIP_BARE_HANDS) {
-        player.equipmentState = PLAYER_EQUIP_HANDGUN;
-        TraceLog(LOG_INFO, "Player auto-equipped handgun after kill");
-    }
-}
-
 // --- MENU BUTTONS ---
 static Rectangle btnEpisode1;
 static Rectangle btnEpisode2;
 static Rectangle btnQuit;
 
+// Player menu (shown in non-dev builds)
+static Rectangle btnPlay;
+static Rectangle btnContinue;
+
 // Helper to reset game state for a specific level
 static void StartLevel(int episodeId) {
     gameOver = false;
     gameWon = false;
+    gameCtx.hasWonLastEpisode = false;
     maskActive = false;
     currentState = STATE_PLAYING;
 
@@ -172,15 +95,43 @@ static void StartLevel(int episodeId) {
     // Init Level
     InitLevel(episodeId, &currentLevel);
 
+    // Progress context
+    gameCtx.hasProgress = true;
+
     // Player
     player = InitPlayer(currentLevel.playerSpawn, currentLevel.playerStartId);
-    player.equipmentState = PLAYER_EQUIP_KNIFE;
     player.rotation = 0.0f;
-    player.magAmmo = MAG_SIZE;
-    player.reserveAmmo = RESERVE_AMMO_START;
     player.isReloading = false;
     player.reloadTimer = 0.0f;
     weaponShootTimer = 0.0f;
+
+    // Story progression: if we have a saved player context AND we're starting the next episode,
+    // carry identity/equipment/ammo/inventory across.
+    bool shouldCarryPlayer = gameCtx.player.valid && (episodeId == gameCtx.nextEpisodeId);
+    if (shouldCarryPlayer) {
+        player.identity = gameCtx.player.identity;
+        player.magAmmo = gameCtx.player.magAmmo;
+        player.reserveAmmo = gameCtx.player.reserveAmmo;
+    player.equipmentState = GameContext_AllowsEquip(&gameCtx, gameCtx.player.equipped)
+                  ? gameCtx.player.equipped
+                  : PLAYER_EQUIP_KNIFE;
+    } else {
+        // Fresh episode start (new game / replay): defaults
+        player.equipmentState = PLAYER_EQUIP_KNIFE;
+        player.magAmmo = MAG_SIZE;
+        player.reserveAmmo = RESERVE_AMMO_START;
+
+        // Also reset inventory to a minimal baseline.
+    gameCtx.player.valid = true;
+    gameCtx.player.identity = player.identity;
+    gameCtx.player.equipped = player.equipmentState;
+    gameCtx.player.magAmmo = player.magAmmo;
+    gameCtx.player.reserveAmmo = player.reserveAmmo;
+    gameCtx.player.hasFlashlight = true; // optional baseline; feels nice for early game
+    gameCtx.player.hasHandgun = false;
+    gameCtx.player.hasRifle = false;
+    gameCtx.player.hasShotgun = false;
+    }
     lastEquipmentState = player.equipmentState;
 
     // Camera
@@ -197,12 +148,19 @@ static void StartLevel(int episodeId) {
     
     playerFramePivotReady = false;
     if (playerRender.loaded) {
-        UpdatePlayerPivotFromFrame(AnimPlayer_GetFrame(&playerRender.feetAnim));
+        if (PlayerRender_TryComputePivotFromFrame(AnimPlayer_GetFrame(&playerRender.feetAnim),
+                                                  playerPivotAlphaThreshold,
+                                                  &playerFramePivot)) {
+            playerFramePivotReady = true;
+        }
     }
 }
 
 void Game_Init(void) {
     currentState = STATE_MENU;
+
+    // Start a fresh story by default.
+    GameContext_Init(&gameCtx);
 
     Hud_Init();
 
@@ -216,6 +174,10 @@ void Game_Init(void) {
     btnEpisode1 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY, (float)btnWidth, (float)btnHeight };
     btnEpisode2 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 70, (float)btnWidth, (float)btnHeight };
     btnQuit     = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 140, (float)btnWidth, (float)btnHeight };
+
+    // Player-facing menu buttons reuse the same layout slots.
+    btnPlay     = btnEpisode1;
+    btnContinue = btnEpisode2;
 }
 
 // Helper for HighDPI Mouse Scaling
@@ -235,6 +197,8 @@ static void UpdateMenu(void) {
     Vector2 mousePos = GetScaledMousePosition();
 
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        // Developer build: manual episode picking.
+#if defined(DEV_MODE) && (DEV_MODE)
         if (CheckCollisionPointRec(mousePos, btnEpisode1)) {
             StartLevel(1);
         } else if (CheckCollisionPointRec(mousePos, btnEpisode2)) {
@@ -242,6 +206,21 @@ static void UpdateMenu(void) {
         } else if (CheckCollisionPointRec(mousePos, btnQuit)) {
             CloseWindow();
         }
+#else
+        // Player build: story-driven flow.
+        if (CheckCollisionPointRec(mousePos, btnPlay)) {
+            // New Game
+            gameCtx.nextEpisodeId = 1;
+            StartLevel(gameCtx.nextEpisodeId);
+        } else if (CheckCollisionPointRec(mousePos, btnContinue)) {
+            // Continue (only if player has started before)
+            if (gameCtx.hasProgress) {
+                StartLevel(gameCtx.nextEpisodeId);
+            }
+        } else if (CheckCollisionPointRec(mousePos, btnQuit)) {
+            CloseWindow();
+        }
+#endif
     }
 }
 
@@ -259,13 +238,24 @@ static void DrawMenu(void) {
     Color normalColor = GRAY;
     Vector2 mousePos = GetScaledMousePosition();
 
-    // Episode 1
+    // Developer build: manual stage/episode picking.
+#if defined(DEV_MODE) && (DEV_MODE)
     DrawRectangleRec(btnEpisode1, CheckCollisionPointRec(mousePos, btnEpisode1) ? hoverColor : normalColor);
     DrawText("EPISODE 1", btnEpisode1.x + 40, btnEpisode1.y + 15, 20, WHITE);
 
-    // Episode 2
     DrawRectangleRec(btnEpisode2, CheckCollisionPointRec(mousePos, btnEpisode2) ? hoverColor : normalColor);
     DrawText("EPISODE 2", btnEpisode2.x + 40, btnEpisode2.y + 15, 20, WHITE);
+#else
+    // Player build: story menu.
+    DrawRectangleRec(btnPlay, CheckCollisionPointRec(mousePos, btnPlay) ? hoverColor : normalColor);
+    DrawText("PLAY", btnPlay.x + 70, btnPlay.y + 15, 20, WHITE);
+
+    bool canContinue = gameCtx.hasProgress;
+    Color continueColor = canContinue ? normalColor : Fade(normalColor, 0.35f);
+    Color continueTextColor = canContinue ? WHITE : Fade(WHITE, 0.5f);
+    DrawRectangleRec(btnContinue, CheckCollisionPointRec(mousePos, btnContinue) && canContinue ? hoverColor : continueColor);
+    DrawText("CONTINUE", btnContinue.x + 45, btnContinue.y + 15, 20, continueTextColor);
+#endif
 
     // Quit
     DrawRectangleRec(btnQuit, CheckCollisionPointRec(mousePos, btnQuit) ? hoverColor : normalColor);
@@ -280,11 +270,51 @@ static void UpdateGame(float dt) {
 
     // Game Over / Win Logic Inputs
     if (gameOver || gameWon) {
-        if (IsKeyPressed(KEY_R)) {
-            StartLevel(currentLevel.id); // Restart current level
+        // GAME OVER
+        if (gameOver) {
+            if (IsKeyPressed(KEY_R)) {
+                StartLevel(currentLevel.id); // Restart current level
+            }
+            if (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_SPACE)) {
+                currentState = STATE_MENU; // Return to menu
+            }
+            return;
         }
-        if (IsKeyPressed(KEY_SPACE)) {
-            currentState = STATE_MENU; // Return to menu
+
+        // WIN
+        if (gameWon) {
+            // Update progress context (used by Continue / Next).
+            gameCtx.hasWonLastEpisode = true;
+            GameContext_SaveFromPlayer(&gameCtx, &player);
+            if (currentLevel.id == 1) {
+                gameCtx.nextEpisodeId = 2;
+            }
+
+            // Player builds: Next or Menu.
+#if !defined(DEV_MODE) || !(DEV_MODE)
+            if (IsKeyPressed(KEY_N)) {
+                StartLevel(gameCtx.nextEpisodeId);
+                return;
+            }
+            if (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_SPACE)) {
+                currentState = STATE_MENU;
+                return;
+            }
+#else
+            // Dev builds: Replay, Next, or Menu.
+            if (IsKeyPressed(KEY_R)) {
+                StartLevel(currentLevel.id);
+                return;
+            }
+            if (IsKeyPressed(KEY_N)) {
+                StartLevel(gameCtx.nextEpisodeId);
+                return;
+            }
+            if (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_SPACE)) {
+                currentState = STATE_MENU;
+                return;
+            }
+#endif
         }
         return;
     }
@@ -391,9 +421,14 @@ static void UpdateGame(float dt) {
     if (player.equipmentState == PLAYER_EQUIP_KNIFE || 
         player.equipmentState == PLAYER_EQUIP_FLASHLIGHT ||
         player.equipmentState == PLAYER_EQUIP_BARE_HANDS) {
-        meleeTargetIndex = GetClosestEnemyInRange(player.position, meleeRange);
+        meleeTargetIndex = PlayerActions_GetClosestEnemyInRange(&currentLevel, player.position, meleeRange);
         if (meleeTargetIndex != -1 && IsKeyPressed(KEY_E)) {
-            HandleEnemyKilled(meleeTargetIndex);
+            PlayerActions_HandleEnemyKilled(&currentLevel,
+                                            meleeTargetIndex,
+                                            &player,
+                                            &droppedMask,
+                                            &maskActive,
+                                            droppedMaskRadius);
             meleeTargetIndex = -1;
         }
     }
@@ -431,7 +466,12 @@ static void UpdateGame(float dt) {
                     CheckCollisionCircles(bullets[i].position, bullets[i].radius,
                                           currentLevel.enemies[e].position, currentLevel.enemies[e].radius)) {
                     bullets[i].active = false;
-                    HandleEnemyKilled(e);
+                    PlayerActions_HandleEnemyKilled(&currentLevel,
+                                                    e,
+                                                    &player,
+                                                    &droppedMask,
+                                                    &maskActive,
+                                                    droppedMaskRadius);
                 }
             }
         } else {
@@ -480,11 +520,20 @@ static void DrawGame(void) {
         if (gameOver) {
             DrawText("GAME OVER", sw / 2 - 100, sh / 2 - 20, 40, RED);
             DrawText("Press R to Restart Level", sw / 2 - 100, sh / 2 + 30, 20, RAYWHITE);
-            DrawText("Press SPACE to Menu", sw / 2 - 100, sh / 2 + 60, 20, RAYWHITE);
+            DrawText("Press M to Menu", sw / 2 - 100, sh / 2 + 60, 20, RAYWHITE);
         } else {
             DrawText("EPISODE COMPLETE!", sw / 2 - 150, sh / 2 - 20, 40, GOLD);
+            // Player builds: Next + Menu.
+#if !defined(DEV_MODE) || !(DEV_MODE)
+            DrawText("Press N to Next", sw / 2 - 100, sh / 2 + 30, 20, RAYWHITE);
+            DrawText("Press M to Menu", sw / 2 - 100, sh / 2 + 60, 20, RAYWHITE);
+            DrawText("(Saving will be added later)", sw / 2 - 130, sh / 2 + 90, 18, Fade(RAYWHITE, 0.7f));
+#else
+            // Dev builds: Replay still useful.
             DrawText("Press R to Replay", sw / 2 - 100, sh / 2 + 30, 20, RAYWHITE);
-            DrawText("Press SPACE to Menu", sw / 2 - 100, sh / 2 + 60, 20, RAYWHITE);
+            DrawText("Press N to Next", sw / 2 - 100, sh / 2 + 60, 20, RAYWHITE);
+            DrawText("Press M to Menu", sw / 2 - 100, sh / 2 + 90, 20, RAYWHITE);
+#endif
         }
     } else {
         BeginMode2D(camera);
@@ -541,7 +590,7 @@ static void DrawGame(void) {
             PlayerRender_Draw(&playerRender, &player);
             PlayerRender_DrawMuzzleFlash(&playerRender, &player, weaponShootTimer);
         } else {
-            DrawPlayerFallback(player.position, player.radius);
+            PlayerRender_DrawFallback(player.position, player.radius);
         }
         if (meleeTargetIndex >= 0 && meleeTargetIndex < currentLevel.enemyCount &&
             currentLevel.enemies[meleeTargetIndex].active) {

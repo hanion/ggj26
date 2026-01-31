@@ -1,8 +1,9 @@
-#ifndef PLAYER_RENDER_H
-#define PLAYER_RENDER_H
 
 #include "anim.h"
 #include "entity.h"
+
+#ifndef PLAYER_RENDER_H
+#define PLAYER_RENDER_H
 
 // Holds all player-related visual assets and animation state.
 typedef struct {
@@ -64,6 +65,15 @@ typedef struct {
     float spriteScale;
     Vector2 spritePivot;
 } PlayerRender;
+
+// Small rendering utilities used by game/player rendering.
+void PlayerRender_DrawFallback(Vector2 position, float radius);
+
+// Attempts to compute a pivot (normalized 0..1) based on opaque pixels in a sprite frame.
+// Returns true on success.
+bool PlayerRender_TryComputePivotFromFrame(Texture2D frame,
+										  unsigned char alphaThreshold,
+										  Vector2 *outPivot);
 
 void PlayerRender_Init(PlayerRender *pr);
 void PlayerRender_LoadEpisodeAssets(PlayerRender *pr);
