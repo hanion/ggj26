@@ -1,6 +1,6 @@
 
-#include "anim.h"
-#include "entity.h"
+#include "../anim.h"
+#include "../entity.h"
 
 #ifndef PLAYER_RENDER_H
 #define PLAYER_RENDER_H

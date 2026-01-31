@@ -1,19 +1,27 @@
-#include "game.h"
-
+// Standard
 #include <math.h>
 #include <stdio.h>
 
+// External
 #include "../raylib/src/raylib.h"
 #include "../raylib/src/raymath.h"
-#include "anim.h"
-#include "enemies/enemy.h"
-#include "entity.h"
-#include "episodes/episodes.h"
-#include "levels.h"
-#include "player/player.h"
-#include "player/player_render.h"
+#include "../raylib/src/rlgl.h"
+
+// Core & Context
+#include "types.h"
+#include "game.h"
 #include "game_context.h"
+#include "entity.h"
+#include "levels.h"
+#include "anim.h"
+#include "gameplay_helpers.h"
+
+// Game Modules
+#include "episodes/episodes.h"
+#include "enemies/enemy.h"
+#include "player/player.h"
 #include "player/player_actions.h"
+#include "player/player_render.h"
 #include "ui/hud.h"
 #include "types.h"
 
@@ -46,9 +54,9 @@ static Camera2D camera;
 
 static Bullet bullets[MAX_BULLETS];
 static Entity droppedMask;
-static Bullet bullets[MAX_BULLETS];
-static Entity droppedMask;
 static bool maskActive;
+static float levelStartTimer = 0.0f;
+static const float LEVEL_START_DELAY = 1.0f;
 
 static GameContext gameCtx;
 
@@ -67,9 +75,9 @@ static float weaponShootTimer = 0.0f;
 static const float weaponShootHold = 0.2f;
 static PlayerEquipState lastEquipmentState = PLAYER_EQUIP_KNIFE;
 
-// Melee
+
 static int meleeTargetIndex = -1;
-static float meleeRange = 40.0f;
+static float meleeRange = 80.0f;
 static float meleePromptOffset = 40.0f;
 static float meleePromptHorizontalOffset = 40.0f;
 static float droppedMaskRadius = 15.0f;
@@ -135,6 +143,7 @@ void StartLevel(int id) {
     gameCtx.hasWonLastEpisode = false;
     maskActive = false;
     currentState = STATE_PLAYING;
+    levelStartTimer = LEVEL_START_DELAY;
 
     // Reset bullets
     for (int i = 0; i < MAX_BULLETS; i++) bullets[i].active = false;
@@ -341,6 +350,12 @@ static void UpdateGame(float dt) {
         }
         return;
     }
+
+    // Level Start Countdown
+    if (levelStartTimer > 0) {
+        levelStartTimer -= dt;
+        return; // Don't update player or enemies yet
+    }
     
     // Helper function to check if player has a gun equipped
     bool hasGunEquipped = (player.equipmentState == PLAYER_EQUIP_HANDGUN ||
@@ -406,7 +421,7 @@ static void UpdateGame(float dt) {
     }
 
     // Player Shooting
-    bool shootPressed = IsMouseButtonPressed(MOUSE_LEFT_BUTTON) || IsKeyPressed(KEY_SPACE);
+    bool shootPressed = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
     if (shootPressed) {
         bool canShoot = hasGunEquipped && HasAbility(player.identity, ABILITY_SHOOT) && !player.isReloading;
         
@@ -454,7 +469,7 @@ static void UpdateGame(float dt) {
 
     // Enemy Update
     for (int i = 0; i < currentLevel.enemyCount; i++) {
-        UpdateEnemy(&currentLevel.enemies[i], player.position, bullets, MAX_BULLETS, dt, &currentLevel);
+        UpdateEnemy(&currentLevel.enemies[i], player.position, &currentLevel, bullets, MAX_BULLETS, dt);
     }
 
     // Bullet Updates & Collisions
@@ -575,10 +590,13 @@ static void DrawGame(void) {
         // Draw Level Elements
         for (int i = 0; i < currentLevel.wallCount; i++) DrawRectangleRec(currentLevel.walls[i], GRAY);
         for (int i = 0; i < currentLevel.doorCount; i++) {
-            Color dColor = currentLevel.doorsOpen[i] ? GREEN : DARKGRAY;
-            if (!currentLevel.doorsOpen[i]) DrawRectangleRec(currentLevel.doors[i], dColor);
-            else DrawRectangleLinesEx(currentLevel.doors[i], 3.0f, GREEN);
+            if (!currentLevel.doorsOpen[i]) {
+                DrawRectangleRec(currentLevel.doors[i], Fade(BLUE, 0.3f));
+            } else {
+                DrawRectangleLinesEx(currentLevel.doors[i], 3.0f, GREEN);
+            }
         }
+
 
         if (currentLevel.id == 1) {
              DrawText("ZONE 1: STAFF ONLY", 400, 300, 30, Fade(WHITE, 0.1f));
@@ -588,6 +606,46 @@ static void DrawGame(void) {
         // Enemies
         for (int i = 0; i < currentLevel.enemyCount; i++) {
             if (currentLevel.enemies[i].active) {
+                // Draw Vision Cone
+                float halfAngle = currentLevel.enemies[i].sightAngle / 2.0f;
+                Vector2 origin = currentLevel.enemies[i].position;
+                float startAngle = currentLevel.enemies[i].rotation - halfAngle;
+                float endAngle = currentLevel.enemies[i].rotation + halfAngle;
+                int segments = 30; 
+                float step = (endAngle - startAngle) / segments;
+                
+                rlSetTexture(0);
+                rlDisableBackfaceCulling(); // Ensure we see it regardless of winding
+                rlBegin(RL_TRIANGLES);
+                rlColor4ub(200, 200, 200, 60); // Light Gray, Semi-transparent
+
+                for (int s = 0; s < segments; s++) {
+                    float a1 = (startAngle + s * step) * DEG2RAD;
+                    float a2 = (startAngle + (s + 1) * step) * DEG2RAD;
+
+                    Vector2 d1 = { cosf(a1) * currentLevel.enemies[i].sightRange, sinf(a1) * currentLevel.enemies[i].sightRange };
+                    Vector2 d2 = { cosf(a2) * currentLevel.enemies[i].sightRange, sinf(a2) * currentLevel.enemies[i].sightRange };
+
+                    Vector2 p1 = Vector2Add(origin, d1);
+                    Vector2 p2 = Vector2Add(origin, d2);
+                    
+                    // Raycast against walls
+                    p1 = Gameplay_GetRayHit(origin, p1, &currentLevel);
+                    p2 = Gameplay_GetRayHit(origin, p2, &currentLevel);
+
+                    // Draw Triangle (Origin -> P1 -> P2)
+                    rlVertex2f(origin.x, origin.y);
+                    rlVertex2f(p1.x, p1.y);
+                    rlVertex2f(p2.x, p2.y);
+                    
+                    // Draw Backface just in case
+                    rlVertex2f(origin.x, origin.y);
+                    rlVertex2f(p2.x, p2.y);
+                    rlVertex2f(p1.x, p1.y);
+                }
+                rlEnd();
+                rlEnableBackfaceCulling(); // Reset default (though usually off in 2D)
+
                 DrawCircleV(currentLevel.enemies[i].position, currentLevel.enemies[i].radius, currentLevel.enemies[i].identity.color);
                 DrawCircleLines((int)currentLevel.enemies[i].position.x, (int)currentLevel.enemies[i].position.y, currentLevel.enemies[i].radius + 2, WHITE);
             }
@@ -623,9 +681,12 @@ static void DrawGame(void) {
         }
         
         EndMode2D();
-        
-        // HUD
-        Hud_DrawPlayer(&player);
+    // HUD
+    Hud_DrawPlayer(&player);
+
+    if (levelStartTimer > 0) {
+        DrawText("READY...", GetScreenWidth()/2 - 50, GetScreenHeight()/2, 30, RED);
+    }
     }
     EndDrawing();
 }

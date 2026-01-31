@@ -1,5 +1,5 @@
 #include "player.h"
-#include "../raylib/src/raymath.h"
+#include "../../raylib/src/raymath.h"
 
 Entity InitPlayer(Vector2 spawnPos, Identity startIdentity) {
   Entity player = {.position = spawnPos,
@@ -59,6 +59,16 @@ void UpdatePlayer(Entity *player, Level *currentLevel, float dt) {
       newPos.x = xPos.x;
     }
 
+    // Check Enemy Collision (X)
+    for (int i = 0; i < currentLevel->enemyCount; i++) {
+        if (!currentLevel->enemies[i].active) continue;
+        if (CheckCollisionCircles(newPos, player->radius, currentLevel->enemies[i].position, currentLevel->enemies[i].radius)) {
+            // Revert X change if colliding with enemy
+            newPos.x = player->position.x; 
+            break;
+        }
+    }
+
     // --- Y AXIS ---
     Vector2 yPos = newPos;
     yPos.y += delta.y;
@@ -81,6 +91,18 @@ void UpdatePlayer(Entity *player, Level *currentLevel, float dt) {
 
     if (!blocked_y) {
       newPos.y = yPos.y;
+    }
+
+    // Check Enemy Collision (Y)
+    for (int i = 0; i < currentLevel->enemyCount; i++) {
+        if (!currentLevel->enemies[i].active) continue;
+        if (CheckCollisionCircles(newPos, player->radius, currentLevel->enemies[i].position, currentLevel->enemies[i].radius)) {
+            // Revert Y change if colliding with enemy
+            newPos.y = player->position.y; // Note: player->position.y is the original Y (since we haven't updated player->position yet)
+            // Wait, newPos.x might have changed from the X step. We only want to revert Y.
+            // If we revert to player->position.y, that is correct (Keep X change, revert Y change).
+            break;
+        }
     }
 
     player->position = newPos;

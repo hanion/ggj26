@@ -1,8 +1,8 @@
 
-#include "../raylib/src/raylib.h"
-#include "entity.h"
-#include "levels.h"
-#include "types.h"
+#include "../../raylib/src/raylib.h"
+#include "../entity.h"
+#include "../levels.h"
+#include "../types.h"
 
 #ifndef PLAYER_H
 #define PLAYER_H

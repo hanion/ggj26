@@ -2,81 +2,266 @@
 #include "../../raylib/src/raymath.h"
 
 
-#define ENEMY_SHOOT_INTERVAL 3.5f
-#define BULLET_SPEED 200.0f
+#define ENEMY_SHOOT_INTERVAL 2.0f
+#define BULLET_SPEED 800.0f
 #define BULLET_RADIUS 5.0f
 #define BULLET_LIFETIME 2.0f
 
-void UpdateEnemy(Entity *enemy, Vector2 playerPos, Bullet *bulletPool,
-                 int maxBullets, float dt, const Level *level) {
-  if (!enemy->active)
-    return;
+// Helper: Check if line segment (p1-p2) intersects a rectangle
+static bool CheckCollisionSegmentRec(Vector2 p1, Vector2 p2, Rectangle rec) {
+    // 1. Box check (optimization)
+    float minX = fminf(p1.x, p2.x);
+    float maxX = fmaxf(p1.x, p2.x);
+    float minY = fminf(p1.y, p2.y);
+    float maxY = fmaxf(p1.y, p2.y);
+    
+    if (maxX < rec.x || minX > rec.x + rec.width ||
+        maxY < rec.y || minY > rec.y + rec.height) {
+        // Broad phase miss
+        return false;
+    }
 
-  // Detection Logic (Simple Radius)
-  if (Vector2Distance(playerPos, enemy->position) < 800.0f) {
+    // 2. Check each edge of the rectangle
+    Vector2 bl = { rec.x, rec.y + rec.height };
+    Vector2 br = { rec.x + rec.width, rec.y + rec.height };
+    Vector2 tr = { rec.x + rec.width, rec.y };
+    Vector2 tl = { rec.x, rec.y };
+    
+    Vector2 collisionPoint;
+    if (CheckCollisionLines(p1, p2, tl, bl, &collisionPoint)) return true; // Left
+    if (CheckCollisionLines(p1, p2, bl, br, &collisionPoint)) return true; // Bottom
+    if (CheckCollisionLines(p1, p2, br, tr, &collisionPoint)) return true; // Right
+    if (CheckCollisionLines(p1, p2, tr, tl, &collisionPoint)) return true; // Top
+    
+    // 3. Check if line is completely INSIDE rectangle
+    // If p1 is inside, then it intersects the area (conceptually invalid LoS)
+    if (p1.x > rec.x && p1.x < rec.x+rec.width && p1.y > rec.y && p1.y < rec.y+rec.height) return true;
+    
+    return false;
+}
 
-    //                                         
-    bool hasLineOfSight = true;
+// Check if enemy can see target (distance, angle, walls)
+bool CheckLineOfSight(Entity *enemy, Vector2 target, Level *level) {
+    if (!enemy->active) return false;
+
+    // 1. Distance Check
+    float dist = Vector2Distance(enemy->position, target);
+    if (dist > enemy->sightRange) return false;
+
+    // 2. Angle Check (Cone)
+    Vector2 toTarget = Vector2Subtract(target, enemy->position);
+    float angleToTarget = atan2f(toTarget.y, toTarget.x) * RAD2DEG;
+    float angleDiff = fabsf(angleToTarget - enemy->rotation);
+    // Wrap angle diff
+    while (angleDiff > 180) angleDiff -= 360;
+    while (angleDiff < -180) angleDiff += 360;
+    if (fabsf(angleDiff) > enemy->sightAngle / 2.0f) return false;
+
+    // 3. Wall Check (Segment Intersection)
     for (int i = 0; i < level->wallCount; i++) {
-        Rectangle r = level->walls[i];
-        // Check 4 lines of the rect
-        Vector2 p1 = {r.x, r.y};
-        Vector2 p2 = {r.x + r.width, r.y};
-        Vector2 p3 = {r.x + r.width, r.y + r.height};
-        Vector2 p4 = {r.x, r.y + r.height};
-        
-        Vector2 collisionPoint;
-        if (CheckCollisionLines(enemy->position, playerPos, p1, p2, &collisionPoint) ||
-            CheckCollisionLines(enemy->position, playerPos, p2, p3, &collisionPoint) ||
-            CheckCollisionLines(enemy->position, playerPos, p3, p4, &collisionPoint) ||
-            CheckCollisionLines(enemy->position, playerPos, p4, p1, &collisionPoint)) {
-            hasLineOfSight = false;
+        if (CheckCollisionSegmentRec(enemy->position, target, level->walls[i])) {
+            return false;
+        }
+    }
+    
+    // Check Doors (Closed ones check)
+    for (int i = 0; i < level->doorCount; i++) {
+        // If door is closed, it blocks sight
+        if (!level->doorsOpen[i]) {
+            if (CheckCollisionSegmentRec(enemy->position, target, level->doors[i])) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+// Helper for collision
+static void MoveEnemyWithCollision(Entity *enemy, Vector2 delta, const Level *level) {
+    Vector2 originalPos = enemy->position;
+
+    // --- X AXIS ---
+    enemy->position.x += delta.x;
+    bool blocked_x = false;
+
+    for (int i = 0; i < level->wallCount; i++) {
+        if (CheckCollisionCircleRec(enemy->position, enemy->radius, level->walls[i])) {
+            blocked_x = true;
             break;
         }
     }
-    // Also check closed doors
-    for (int i = 0; i < level->doorCount; i++) {
-        if (!level->doorsOpen[i]) {
-            Rectangle r = level->doors[i];
-            Vector2 p1 = {r.x, r.y};
-            Vector2 p2 = {r.x + r.width, r.y};
-            Vector2 p3 = {r.x + r.width, r.y + r.height};
-            Vector2 p4 = {r.x, r.y + r.height};
-            
-            Vector2 collisionPoint;
-            if (CheckCollisionLines(enemy->position, playerPos, p1, p2, &collisionPoint) ||
-                CheckCollisionLines(enemy->position, playerPos, p2, p3, &collisionPoint) ||
-                CheckCollisionLines(enemy->position, playerPos, p3, p4, &collisionPoint) ||
-                CheckCollisionLines(enemy->position, playerPos, p4, p1, &collisionPoint)) {
-                hasLineOfSight = false;
-                break;
+    for (int i = 0; i < level->doorCount && !blocked_x; i++) {
+        if (CheckCollisionCircleRec(enemy->position, enemy->radius, level->doors[i])) {
+             if (enemy->identity.permissionLevel < level->doorPerms[i] && !level->doorsOpen[i]) {
+                blocked_x = true;
             }
         }
     }
 
-    if (hasLineOfSight) {
-        // Timer Logic
-        enemy->shootTimer -= dt;
-        if (enemy->shootTimer <= 0) {
-          enemy->shootTimer = ENEMY_SHOOT_INTERVAL;
+    if (blocked_x) {
+        enemy->position.x = originalPos.x;
+    }
 
-          // Shooting Logic: Find dead bullet and fire
-          for (int b = 0; b < maxBullets; b++) {
-            if (!bulletPool[b].active) {
-              bulletPool[b].active = true;
-              bulletPool[b].position = enemy->position;
-              bulletPool[b].radius = BULLET_RADIUS;
-              bulletPool[b].lifeTime = BULLET_LIFETIME;
-              bulletPool[b].isPlayerOwned = false; // Enemy Bullet
+    // --- Y AXIS ---
+    enemy->position.y += delta.y;
+    bool blocked_y = false;
 
-              Vector2 toPlayer = Vector2Subtract(playerPos, enemy->position);
-              bulletPool[b].velocity =
-                  Vector2Scale(Vector2Normalize(toPlayer),
-                               BULLET_SPEED * 0.6f); // Slower bullets for enemies
-              break;
+    for (int i = 0; i < level->wallCount; i++) {
+        if (CheckCollisionCircleRec(enemy->position, enemy->radius, level->walls[i])) {
+            blocked_y = true;
+            break;
+        }
+    }
+    for (int i = 0; i < level->doorCount && !blocked_y; i++) {
+        if (CheckCollisionCircleRec(enemy->position, enemy->radius, level->doors[i])) {
+             if (enemy->identity.permissionLevel < level->doorPerms[i] && !level->doorsOpen[i]) {
+                blocked_y = true;
             }
+        }
+    }
+
+    if (blocked_y) {
+        enemy->position.y = originalPos.y;
+    }
+}
+
+void UpdateEnemy(Entity *enemy, Vector2 playerPos, Level *level, Bullet *bulletPool,
+                 int maxBullets, float dt) {
+  if (!enemy->active) return;
+  
+  bool seesPlayer = CheckLineOfSight(enemy, playerPos, level);
+  
+  // -- AI STATE MACHINE TRANSITIONS --
+  if (seesPlayer) {
+      if (enemy->state != STATE_ATTACK) {
+          // Triggered!
+          enemy->state = STATE_ATTACK;
+      }
+      enemy->lastKnownPlayerPos = playerPos;
+      enemy->searchTimer = 0.1f; // Reset search timer
+  } else {
+      if (enemy->state == STATE_ATTACK) {
+          // Lost sight
+          if (enemy->aiType == AI_WALKER) {
+              enemy->state = STATE_SEARCH;
+          } else {
+              enemy->state = STATE_IDLE; // Guardians just stop
           }
-        }
-    }
+      }
+  }
+
+  // -- AI BEHAVIOR --
+  switch (enemy->state) {
+      case STATE_IDLE:
+          if (enemy->aiType == AI_WALKER) {
+              // Idle for a bit, then pick a new patrol point
+              enemy->searchTimer -= dt; // Reusing searchTimer for idle/patrol wait
+              if (enemy->searchTimer <= 0) {
+                  // Pick a random point near patrolStart
+                  float angle = (float)GetRandomValue(0, 360) * DEG2RAD;
+                  float dist = (float)GetRandomValue(50, 200);
+                  Vector2 offset = { cosf(angle)*dist, sinf(angle)*dist };
+                  // Ensure random point is valid? For now just try to go there
+                  enemy->lastKnownPlayerPos = Vector2Add(enemy->position, offset); 
+                  enemy->state = STATE_PATROL;
+              }
+          }
+          break;
+          
+      case STATE_ATTACK:
+          // Aim at player
+          {
+              Vector2 toPlayer = Vector2Subtract(playerPos, enemy->position);
+              
+              float targetAngle = atan2f(toPlayer.y, toPlayer.x) * RAD2DEG;
+              
+              // Smooth rotation
+              float angleDiff = targetAngle - enemy->rotation;
+                while (angleDiff > 180) angleDiff -= 360;
+                while (angleDiff < -180) angleDiff += 360;
+              enemy->rotation += angleDiff * 5.0f * dt;
+
+              
+              if (enemy->aiType == AI_WALKER) {
+                  // Chase Player
+                  float dist = Vector2Length(toPlayer);
+                  if (dist > 100) { // Keep some distance
+                       Vector2 moveDir = Vector2Normalize(toPlayer);
+                       Vector2 delta = Vector2Scale(moveDir, enemy->identity.speed * dt);
+                       MoveEnemyWithCollision(enemy, delta, level);
+                  }
+              }
+              
+              // Shoot
+              enemy->shootTimer -= dt;
+              if (enemy->shootTimer <= 0 && seesPlayer) { // Only shoot if we definitely see player
+                  enemy->shootTimer = ENEMY_SHOOT_INTERVAL;
+                   for (int b = 0; b < maxBullets; b++) {
+                        if (!bulletPool[b].active) {
+                            bulletPool[b].active = true;
+                            bulletPool[b].position = enemy->position;
+                            bulletPool[b].radius = BULLET_RADIUS;
+                            bulletPool[b].lifeTime = BULLET_LIFETIME;
+                            bulletPool[b].isPlayerOwned = false; 
+
+                            Vector2 fireDir = Vector2Subtract(playerPos, enemy->position);
+                            // Add inaccuracy
+                            fireDir = Vector2Rotate(fireDir, (float)GetRandomValue(-5, 5) * DEG2RAD);
+                            
+                            bulletPool[b].velocity = Vector2Scale(Vector2Normalize(fireDir), BULLET_SPEED * 0.6f);
+                            break;
+                        }
+                   }
+              }
+          }
+          break;
+          
+      case STATE_SEARCH:
+          if (enemy->aiType == AI_WALKER) {
+               // Move to last known position
+               Vector2 toLast = Vector2Subtract(enemy->lastKnownPlayerPos, enemy->position);
+               float dist = Vector2Length(toLast);
+               
+               if (dist > 20) {
+                   // Moving to search target
+                   Vector2 delta = Vector2Scale(Vector2Normalize(toLast), enemy->identity.speed * dt);
+                   MoveEnemyWithCollision(enemy, delta, level); // This handles walls
+                   float targetAngle = atan2f(toLast.y, toLast.x) * RAD2DEG;
+                   enemy->rotation = targetAngle;
+               } else {
+                   // Arrived at last known, wait 3 seconds
+                   enemy->searchTimer -= dt;
+                   // Spin around looking
+                   enemy->rotation += 90 * dt; 
+                   
+                   if (enemy->searchTimer <= 0) {
+                       enemy->state = STATE_PATROL; // Return to patrol logic
+                       enemy->searchTimer = 0.1f; // Wait a bit before starting patrol
+                   }
+               }
+          }
+          break;
+          
+      case STATE_PATROL:
+          // Move to random patrol point (stored in lastKnownPlayerPos)
+          {
+              Vector2 toTarget = Vector2Subtract(enemy->lastKnownPlayerPos, enemy->position);
+              float dist = Vector2Length(toTarget);
+              
+              if (dist > 10) {
+                  Vector2 delta = Vector2Scale(Vector2Normalize(toTarget), enemy->identity.speed * 0.5f * dt);
+                  MoveEnemyWithCollision(enemy, delta, level);
+                  enemy->rotation = atan2f(toTarget.y, toTarget.x) * RAD2DEG;
+                  
+                  // If stuck (didn't move), give up
+                  // Optimization: Store prev pos, checks
+              } else {
+                  // Reached patrol point
+                  enemy->state = STATE_IDLE; 
+                  enemy->searchTimer = (float)GetRandomValue(10, 30) / 10.0f; // Idle for 1-3 seconds
+              }
+          }
+          break;
   }
 }

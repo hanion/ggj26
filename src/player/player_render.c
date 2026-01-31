@@ -1,7 +1,7 @@
 #include "player_render.h"
 
 #include <stddef.h>
-#include "../raylib/src/raymath.h"
+#include "../../raylib/src/raymath.h"
 
 // Keep these local so game.c stays clean.
 typedef enum {

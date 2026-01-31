@@ -9,6 +9,9 @@
 // - Windows: FindFirstFile/FindNextFile
 #if defined(_WIN32)
     #define WIN32_LEAN_AND_MEAN
+    #define NOGDI   // All GDI defines and routines
+    #define NOUSER  // All User defines and routines
+
     #include <windows.h>
 #else
     #include <dirent.h>
