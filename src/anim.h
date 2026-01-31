@@ -14,6 +14,7 @@ typedef struct {
     AnimClip *clip;
     float time;
     int frame_index;
+    bool loop;
 } AnimPlayer;
 
 AnimClip LoadAnimClip(const char *directory, float fps);
@@ -21,5 +22,8 @@ void UnloadAnimClip(AnimClip *clip);
 void AnimPlayer_SetClip(AnimPlayer *player, AnimClip *clip);
 void AnimPlayer_Update(AnimPlayer *player, float dt);
 Texture2D AnimPlayer_GetFrame(const AnimPlayer *player);
+
+// True when a non-looping player has reached the last frame.
+bool AnimPlayer_IsFinished(const AnimPlayer *player);
 
 #endif // ANIM_H
