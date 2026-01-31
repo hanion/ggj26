@@ -216,14 +216,16 @@ void level_editor_draw(LevelEditor* ed, Camera2D camera) {
 
     EndMode2D();
 
-    DrawText(
-        TextFormat(
-            "EDITOR | state: %d | selected: %d",
-            ed->state,
-            ed->selected
-        ),
-        10, 800, 20, YELLOW
-    );
+    if (ed->state != ED_CLOSED) {
+        DrawText(
+            TextFormat(
+                "EDITOR | state: %d | selected: %d",
+                ed->state,
+                ed->selected
+            ),
+            10, 800, 20, YELLOW
+        );
+    }
 }
 
 
