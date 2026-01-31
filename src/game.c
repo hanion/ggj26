@@ -623,8 +623,8 @@ static void UpdateGame(float dt) {
         // Door Collision (Closed)
         if (!hit) {
             for (int d = 0; d < currentLevel.doorCount; d++) {
-                if (!currentLevel.doorsOpen[d] &&
-                    CheckCollisionCircleRec(bullets[i].position, bullets[i].radius, currentLevel.doors[d])) {
+                if (!currentLevel.doors[d].isOpen &&
+                    CheckCollisionCircleRec(bullets[i].position, bullets[i].radius, currentLevel.doors[d].rect)) {
                     hit = true; break;
                 }
             }
@@ -823,25 +823,17 @@ static void UpdateGame(float dt) {
     // 6. Door Logic
     for (int i = 0; i < currentLevel.doorCount; i++) {
         PermissionLevel myLevel = player.inventory.card.level;
-        // If mask active? 
-        // We need to check if active mask provides permission overrides?
-        // Or just use card level which should be updated if we assume card update logic exists.
-        // Wait, did we implement card update logic? 
-        // Previously card level was static or updated via 'identity'.
-        // Let's assume Mask/Identity swap updates card or we just use `player.identity.permissionLevel` if we were syncing it?
-        // The refactor moved to `player.inventory.card.level`.
-        // Let's rely on that.
         
-        bool sufficientPerm = myLevel >= currentLevel.doorPerms[i];
+        bool sufficientPerm = myLevel >= currentLevel.doors[i].requiredPerm;
         if (developerMode) sufficientPerm = true; 
         
-        if (CheckCollisionCircleRec(player.position, player.radius + 10.0f, currentLevel.doors[i]) && sufficientPerm) {
-            currentLevel.doorsOpen[i] = true;
+        if (CheckCollisionCircleRec(player.position, player.radius + 10.0f, currentLevel.doors[i].rect) && sufficientPerm) {
+            currentLevel.doors[i].isOpen = true;
         } else {
             // Only close if player is far enough? Or auto close.
             // Simple auto - check if player is NOT in it.
-            if (!CheckCollisionCircleRec(player.position, player.radius + 5.0f, currentLevel.doors[i])) {
-                 currentLevel.doorsOpen[i] = false;
+            if (!CheckCollisionCircleRec(player.position, player.radius + 5.0f, currentLevel.doors[i].rect)) {
+                 currentLevel.doors[i].isOpen = false;
             }
         }
     }
@@ -894,20 +886,20 @@ static void DrawGame(void) {
         }
         for (int i = 0; i < currentLevel.doorCount; i++) {
             Color doorColor = SKYBLUE;
-            if (currentLevel.doorPerms[i] == PERM_STAFF) doorColor = GREEN;
-            else if (currentLevel.doorPerms[i] == PERM_GUARD) doorColor = RED;
-            else if (currentLevel.doorPerms[i] == PERM_ADMIN) doorColor = PURPLE;
+            if (currentLevel.doors[i].requiredPerm == PERM_STAFF) doorColor = GREEN;
+            else if (currentLevel.doors[i].requiredPerm == PERM_GUARD) doorColor = RED;
+            else if (currentLevel.doors[i].requiredPerm == PERM_ADMIN) doorColor = PURPLE;
 
-            if (!currentLevel.doorsOpen[i]) {
-                DrawRectangleRec(currentLevel.doors[i], Fade(doorColor, 0.6f));
-                DrawRectangleLinesEx(currentLevel.doors[i], 2.0f, WHITE);
+            if (!currentLevel.doors[i].isOpen) {
+                DrawRectangleRec(currentLevel.doors[i].rect, Fade(doorColor, 0.6f));
+                DrawRectangleLinesEx(currentLevel.doors[i].rect, 2.0f, WHITE);
                 
                 // Draw a small lock icon visual (circle)
-                Vector2 center = { currentLevel.doors[i].x + currentLevel.doors[i].width/2, 
-                                   currentLevel.doors[i].y + currentLevel.doors[i].height/2 };
+                Vector2 center = { currentLevel.doors[i].rect.x + currentLevel.doors[i].rect.width/2, 
+                                   currentLevel.doors[i].rect.y + currentLevel.doors[i].rect.height/2 };
                 DrawCircleV(center, 4.0f, WHITE);
             } else {
-                DrawRectangleLinesEx(currentLevel.doors[i], 3.0f, Fade(doorColor, 0.5f));
+                DrawRectangleLinesEx(currentLevel.doors[i].rect, 3.0f, Fade(doorColor, 0.5f));
             }
         }
 

@@ -33,8 +33,8 @@ static inline Vector2 Gameplay_GetRayHit(Vector2 start, Vector2 end, const Level
             rec = level->walls[i];
         } else {
             int doorIdx = i - level->wallCount;
-            if (level->doorsOpen[doorIdx]) continue;
-            rec = level->doors[doorIdx];
+            if (level->doors[doorIdx].isOpen) continue;
+            rec = level->doors[doorIdx].rect;
         }
 
        Vector2 tl = {rec.x, rec.y};
