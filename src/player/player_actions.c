@@ -8,7 +8,7 @@ int PlayerActions_GetClosestEnemyInRange(const Level *level, Vector2 position, f
     float closestDist = range;
     int closestIndex = -1;
     for (int i = 0; i < level->enemyCount; i++) {
-        if (!level->enemies[i].active) {
+        if (!level->enemies[i].active || !level->enemies[i].isEnemy) {
             continue;
         }
         float dist = Vector2Distance(position, level->enemies[i].position);
@@ -34,7 +34,7 @@ void PlayerActions_HandleEnemyKilled(Level *level,
     if (enemyIndex < 0 || enemyIndex >= level->enemyCount) {
         return;
     }
-    if (!level->enemies[enemyIndex].active) {
+    if (!level->enemies[enemyIndex].active || !level->enemies[enemyIndex].isEnemy) {
         return;
     }
 

@@ -99,6 +99,10 @@ static float meleeRange = 80.0f;
 static float meleePromptOffset = 40.0f;
 static float meleePromptHorizontalOffset = 40.0f;
 static float droppedMaskRadius = 15.0f;
+static int npcPromptIndex = -1;
+static int npcInteractionIndex = -1;
+static float npcInteractionTimer = 0.0f;
+static float npcInteractionRange = 80.0f;
 
 // Debug
 static bool playerDebugDraw = false;
@@ -566,6 +570,35 @@ static void UpdateGame(float dt) {
         }
     }
 
+    // 3.5 NPC Interaction
+    npcPromptIndex = -1;
+    if (currentLevel.id == 0) {
+        float closestDist = npcInteractionRange;
+        for (int i = 0; i < currentLevel.enemyCount; i++) {
+            if (!currentLevel.enemies[i].active || currentLevel.enemies[i].isEnemy || !currentLevel.enemies[i].isInteractive) {
+                continue;
+            }
+            float dist = Vector2Distance(player.position, currentLevel.enemies[i].position);
+            if (dist <= closestDist) {
+                closestDist = dist;
+                npcPromptIndex = i;
+            }
+        }
+
+        if (npcPromptIndex != -1 && IsKeyPressed(KEY_E)) {
+            npcInteractionIndex = npcPromptIndex;
+            npcInteractionTimer = 2.0f;
+        }
+    }
+
+    if (npcInteractionTimer > 0.0f) {
+        npcInteractionTimer -= dt;
+        if (npcInteractionTimer <= 0.0f) {
+            npcInteractionTimer = 0.0f;
+            npcInteractionIndex = -1;
+        }
+    }
+
     // 4. Update Bullets
     for (int i = 0; i < MAX_BULLETS; i++) {
         if (!bullets[i].active) continue;
@@ -600,7 +633,7 @@ static void UpdateGame(float dt) {
         if (bullets[i].isPlayerOwned) {
             // Hit Enemy?
             for (int e = 0; e < currentLevel.enemyCount; e++) {
-                if (currentLevel.enemies[e].active) {
+                if (currentLevel.enemies[e].active && currentLevel.enemies[e].isEnemy) {
                     if (CheckCollisionCircles(bullets[i].position, bullets[i].radius, currentLevel.enemies[e].position, currentLevel.enemies[e].radius)) {
                         // Kill Enemy
                         PlayerActions_HandleEnemyKilled(&currentLevel, e, &player, droppedMasks, MAX_MASKS, droppedMaskRadius, droppedCards, MAX_CARDS, droppedGuns, MAX_DROPPED_GUNS);
@@ -884,48 +917,50 @@ static void DrawGame(void) {
              DrawTextPro(GetFontDefault(), "EXIT", (Vector2){480 + origin.x, 2340 + origin.y}, origin, rotation, 40 * scale, 4, burnColor);
         }
 
-        // Enemies
+        // Enemies / NPCs
         for (int i = 0; i < currentLevel.enemyCount; i++) {
             if (currentLevel.enemies[i].active) {
                 // Draw Vision Cone
-                float halfAngle = currentLevel.enemies[i].sightAngle / 2.0f;
-                Vector2 origin = currentLevel.enemies[i].position;
-                float startAngle = currentLevel.enemies[i].rotation - halfAngle;
-                float endAngle = currentLevel.enemies[i].rotation + halfAngle;
-                int segments = 30; 
-                float step = (endAngle - startAngle) / segments;
-                
-                rlSetTexture(0);
-                rlDisableBackfaceCulling(); // Ensure we see it regardless of winding
-                rlBegin(RL_TRIANGLES);
-                rlColor4ub(200, 200, 200, 60); // Light Gray, Semi-transparent
-
-                for (int s = 0; s < segments; s++) {
-                    float a1 = (startAngle + s * step) * DEG2RAD;
-                    float a2 = (startAngle + (s + 1) * step) * DEG2RAD;
-
-                    Vector2 d1 = { cosf(a1) * currentLevel.enemies[i].sightRange, sinf(a1) * currentLevel.enemies[i].sightRange };
-                    Vector2 d2 = { cosf(a2) * currentLevel.enemies[i].sightRange, sinf(a2) * currentLevel.enemies[i].sightRange };
-
-                    Vector2 p1 = Vector2Add(origin, d1);
-                    Vector2 p2 = Vector2Add(origin, d2);
+                if (currentLevel.enemies[i].isEnemy) {
+                    float halfAngle = currentLevel.enemies[i].sightAngle / 2.0f;
+                    Vector2 origin = currentLevel.enemies[i].position;
+                    float startAngle = currentLevel.enemies[i].rotation - halfAngle;
+                    float endAngle = currentLevel.enemies[i].rotation + halfAngle;
+                    int segments = 30; 
+                    float step = (endAngle - startAngle) / segments;
                     
-                    // Raycast against walls
-                    p1 = Gameplay_GetRayHit(origin, p1, &currentLevel);
-                    p2 = Gameplay_GetRayHit(origin, p2, &currentLevel);
+                    rlSetTexture(0);
+                    rlDisableBackfaceCulling(); // Ensure we see it regardless of winding
+                    rlBegin(RL_TRIANGLES);
+                    rlColor4ub(200, 200, 200, 60); // Light Gray, Semi-transparent
 
-                    // Draw Triangle (Origin -> P1 -> P2)
-                    rlVertex2f(origin.x, origin.y);
-                    rlVertex2f(p1.x, p1.y);
-                    rlVertex2f(p2.x, p2.y);
-                    
-                    // Draw Backface just in case
-                    rlVertex2f(origin.x, origin.y);
-                    rlVertex2f(p2.x, p2.y);
-                    rlVertex2f(p1.x, p1.y);
+                    for (int s = 0; s < segments; s++) {
+                        float a1 = (startAngle + s * step) * DEG2RAD;
+                        float a2 = (startAngle + (s + 1) * step) * DEG2RAD;
+
+                        Vector2 d1 = { cosf(a1) * currentLevel.enemies[i].sightRange, sinf(a1) * currentLevel.enemies[i].sightRange };
+                        Vector2 d2 = { cosf(a2) * currentLevel.enemies[i].sightRange, sinf(a2) * currentLevel.enemies[i].sightRange };
+
+                        Vector2 p1 = Vector2Add(origin, d1);
+                        Vector2 p2 = Vector2Add(origin, d2);
+                        
+                        // Raycast against walls
+                        p1 = Gameplay_GetRayHit(origin, p1, &currentLevel);
+                        p2 = Gameplay_GetRayHit(origin, p2, &currentLevel);
+
+                        // Draw Triangle (Origin -> P1 -> P2)
+                        rlVertex2f(origin.x, origin.y);
+                        rlVertex2f(p1.x, p1.y);
+                        rlVertex2f(p2.x, p2.y);
+                        
+                        // Draw Backface just in case
+                        rlVertex2f(origin.x, origin.y);
+                        rlVertex2f(p2.x, p2.y);
+                        rlVertex2f(p1.x, p1.y);
+                    }
+                    rlEnd();
+                    rlEnableBackfaceCulling(); // Reset default (though usually off in 2D)
                 }
-                rlEnd();
-                rlEnableBackfaceCulling(); // Reset default (though usually off in 2D)
 
                 DrawCircleV(currentLevel.enemies[i].position, currentLevel.enemies[i].radius, currentLevel.enemies[i].identity.color);
                 DrawCircleLines((int)currentLevel.enemies[i].position.x, (int)currentLevel.enemies[i].position.y, currentLevel.enemies[i].radius + 2, WHITE);
@@ -983,6 +1018,36 @@ static void DrawGame(void) {
         if (meleeTargetIndex >= 0 && meleeTargetIndex < currentLevel.enemyCount && currentLevel.enemies[meleeTargetIndex].active) {
              DrawText("PRESS E TO CHOKE", (int)player.position.x, (int)player.position.y - 60, 12, WHITE);
         }
+
+        // NPC Prompt & Feedback
+        if (npcPromptIndex >= 0 && npcPromptIndex < currentLevel.enemyCount &&
+            currentLevel.enemies[npcPromptIndex].active && currentLevel.enemies[npcPromptIndex].isInteractive) {
+            Vector2 npcPos = currentLevel.enemies[npcPromptIndex].position;
+            DrawText("PRESS E", (int)npcPos.x - 25, (int)npcPos.y - 30, 10, WHITE);
+        }
+
+        if (npcInteractionIndex >= 0 && npcInteractionIndex < currentLevel.enemyCount &&
+            currentLevel.enemies[npcInteractionIndex].active && currentLevel.enemies[npcInteractionIndex].isInteractive) {
+            const char *npcLabel = "NPC";
+            switch (currentLevel.enemies[npcInteractionIndex].npcType) {
+                case NPC_KIZ:
+                    npcLabel = "KIZ";
+                    break;
+                case NPC_COCUK:
+                    npcLabel = "COCUK";
+                    break;
+                case NPC_BALIKCI:
+                    npcLabel = "BALIKCI";
+                    break;
+                case NPC_SIGARACI:
+                    npcLabel = "SIGARACI";
+                    break;
+                default:
+                    break;
+            }
+            Vector2 npcPos = currentLevel.enemies[npcInteractionIndex].position;
+            DrawText(npcLabel, (int)npcPos.x - 20, (int)npcPos.y - 45, 10, WHITE);
+        }
         
         // Debug
         if (playerDebugDraw) {
@@ -1033,4 +1098,3 @@ void Game_Shutdown(void) {
     UnloadTexture(texZone7);
     if (texEpilogMap.id != 0) UnloadTexture(texEpilogMap);
 }
-

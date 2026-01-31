@@ -27,10 +27,20 @@ typedef enum {
   ENEMY_ADMIN
 } EnemyType;
 
+// NPC Types
+typedef enum {
+  NPC_NONE = 0,
+  NPC_KIZ,
+  NPC_COCUK,
+  NPC_BALIKCI,
+  NPC_SIGARACI
+} NpcType;
+
 // AI Behavior Types
 typedef enum {
   AI_WALKER,
-  AI_GUARDIAN
+  AI_GUARDIAN,
+  AI_NONE
 } AIType;
 
 // AI States

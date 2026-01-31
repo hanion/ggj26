@@ -26,4 +26,58 @@ void InitEpisode0(Level *level) {
     level->doorCount = 0;
     level->enemyCount = 0;
 
+    Identity npcIdentity = GetIdentity(ENEMY_CIVILIAN);
+
+    level->enemies[level->enemyCount++] = (Entity){
+        .position = {140.0f, 300.0f},
+        .active = true,
+        .isPlayer = false,
+        .isEnemy = false,
+        .isInteractive = true,
+        .npcType = NPC_KIZ,
+        .radius = 20.0f,
+        .identity = npcIdentity,
+        .aiType = AI_NONE,
+        .state = STATE_IDLE
+    };
+
+    level->enemies[level->enemyCount++] = (Entity){
+        .position = {210.0f, 330.0f},
+        .active = true,
+        .isPlayer = false,
+        .isEnemy = false,
+        .isInteractive = true,
+        .npcType = NPC_COCUK,
+        .radius = 20.0f,
+        .identity = npcIdentity,
+        .aiType = AI_NONE,
+        .state = STATE_IDLE
+    };
+
+    level->enemies[level->enemyCount++] = (Entity){
+        .position = {740.0f, 430.0f},
+        .active = true,
+        .isPlayer = false,
+        .isEnemy = false,
+        .isInteractive = true,
+        .npcType = NPC_BALIKCI,
+        .radius = 20.0f,
+        .identity = npcIdentity,
+        .aiType = AI_NONE,
+        .state = STATE_IDLE
+    };
+
+    level->enemies[level->enemyCount++] = (Entity){
+        .position = {820.0f, 760.0f},
+        .active = true,
+        .isPlayer = false,
+        .isEnemy = false,
+        .isInteractive = true,
+        .npcType = NPC_SIGARACI,
+        .radius = 20.0f,
+        .identity = npcIdentity,
+        .aiType = AI_NONE,
+        .state = STATE_IDLE
+    };
+
 }

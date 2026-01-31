@@ -8,6 +8,9 @@ Entity InitEnemy(Vector2 position, EnemyType type) {
     enemy.position = position;
     enemy.active = true;
     enemy.isPlayer = false;
+    enemy.isEnemy = true;
+    enemy.isInteractive = false;
+    enemy.npcType = NPC_NONE;
     enemy.radius = 20.0f;
     enemy.shootTimer = ENEMY_SHOOT_INTERVAL;
 
@@ -67,4 +70,3 @@ Identity GetIdentity(EnemyType type) {
             return (Identity){0};
     }
 }
-

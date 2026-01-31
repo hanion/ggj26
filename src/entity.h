@@ -24,6 +24,9 @@ typedef struct {
 
   // Gameplay state
   bool isPlayer;
+  bool isEnemy;
+  bool isInteractive;
+  NpcType npcType;
   float radius;     // Collision size
   float shootTimer; // For AI cooldown / Gun cooldown refactor?
                     // Actually guns have their own cooldowns now in Gun struct. 
