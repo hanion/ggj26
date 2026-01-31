@@ -336,7 +336,9 @@ static void StartLevel(int episodeId) {
     rifleReloadClip = LoadAnimClip("assets/better/character/rifle/reload", 30.0f);
     rifleMeleeClip = LoadAnimClip("assets/better/character/rifle/meleeattack", 30.0f);
     
-    // Load shotgun animations (using rifle for now since spec doesn't list shotgun separately)
+    // Load shotgun animations
+    // NOTE: Using rifle animations as placeholder since shotgun animations
+    // are not listed separately in the asset specification
     shotgunIdleClip = LoadAnimClip("assets/better/character/rifle/idle", 30.0f);
     shotgunMoveClip = LoadAnimClip("assets/better/character/rifle/move", 30.0f);
     shotgunShootClip = LoadAnimClip("assets/better/character/rifle/shoot", 60.0f);
@@ -353,7 +355,9 @@ static void StartLevel(int episodeId) {
     knifeMoveClip = LoadAnimClip("assets/better/character/knife/move", 30.0f);
     knifeMeleeClip = LoadAnimClip("assets/better/character/knife/meleeattack", 30.0f);
     
-    // Load shadow (TODO: update path when shadow asset is available)
+    // Load shadow
+    // TODO: Update to use shadow from better assets when available
+    // Currently using old asset path for backward compatibility
     playerShadow = LoadTexture("assets/character/LightArtilleryRobot/shadow.png");
     
     playerAnimLoaded = feetIdleClip.frame_count > 0 && feetWalkClip.frame_count > 0;
@@ -544,6 +548,8 @@ static void UpdateGame(float dt) {
         if (weaponNextState != weaponAnimState) {
             weaponAnimState = weaponNextState;
             // Set appropriate clip based on weapon type and state
+            // NOTE: For melee weapons (flashlight, knife), WEAPON_SHOOT state
+            // triggers the melee attack animation
             AnimClip *targetClip = NULL;
             switch (player.equipmentState) {
                 case PLAYER_EQUIP_HANDGUN:
