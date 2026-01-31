@@ -57,8 +57,22 @@ static Bullet bullets[MAX_BULLETS];
 static Entity droppedMasks[MAX_MASKS];
 static float levelStartTimer = 0.0f;
 static const float LEVEL_START_DELAY = 1.0f;
+#define MAX_CARDS 10
+static Entity droppedCards[MAX_CARDS];
+
+#define MAX_DROPPED_GUNS 20
+static DroppedGun droppedGuns[MAX_DROPPED_GUNS];
+
+// Sounds
+static Sound fxShoot = {0};
+static Sound fxReload = {0};
 
 static GameContext gameCtx;
+
+// Forward Declarations
+static void DrawGame(void);
+static void UpdateGame(float dt);
+static PlayerEquipState MapGunToEquip(GunType type);
 
 
 static Texture2D texZone1;
@@ -144,6 +158,10 @@ void StartLevel(int id) {
     
     // Reset masks
     for(int i=0; i<MAX_MASKS; i++) droppedMasks[i].active = false;
+    // Reset cards
+    for(int i=0; i<MAX_CARDS; i++) droppedCards[i].active = false;
+    // Reset guns
+    for(int i=0; i<MAX_DROPPED_GUNS; i++) droppedGuns[i].active = false;
     
     currentState = STATE_PLAYING;
     levelStartTimer = LEVEL_START_DELAY;
@@ -165,33 +183,23 @@ void StartLevel(int id) {
     weaponShootTimer = 0.0f;
 
     // Story progression: if we have a saved player context AND we're starting the next episode,
-    // carry identity/equipment/ammo/inventory across.
+    // carry identity/inventory across.
     bool shouldCarryPlayer = gameCtx.player.valid && (id == gameCtx.nextEpisodeId);
     if (shouldCarryPlayer) {
         player.identity = gameCtx.player.identity;
-        player.magAmmo = gameCtx.player.magAmmo;
-        player.reserveAmmo = gameCtx.player.reserveAmmo;
-        player.equipmentState = GameContext_AllowsEquip(&gameCtx, gameCtx.player.equipped)
-                      ? gameCtx.player.equipped
-                      : PLAYER_EQUIP_KNIFE;
+        player.inventory = gameCtx.player.inventory;
     } else {
-        // Fresh episode start (new game / replay): defaults
-        player.equipmentState = PLAYER_EQUIP_KNIFE;
-        player.magAmmo = MAG_SIZE;
-        player.reserveAmmo = RESERVE_AMMO_START;
-
-        // Also reset inventory to a minimal baseline.
+        // Fresh episode start (new game / replay): defaults handled by InitPlayer
+        // But we want to sync the Context if it wasn't valid
         gameCtx.player.valid = true;
         gameCtx.player.identity = player.identity;
-        gameCtx.player.equipped = player.equipmentState;
-        gameCtx.player.magAmmo = player.magAmmo;
-        gameCtx.player.reserveAmmo = player.reserveAmmo;
-        gameCtx.player.hasFlashlight = true; 
-        gameCtx.player.hasHandgun = false;
-        gameCtx.player.hasRifle = false;
-        gameCtx.player.hasShotgun = false;
+        gameCtx.player.inventory = player.inventory;
     }
-    lastEquipmentState = player.equipmentState;
+    // lastEquipmentState legacy check, maybe track GunType instead?
+    // lastEquipmentState = ...? Let's just reset timer
+    weaponShootTimer = 0.0f;
+    GunType startGun = player.inventory.gunSlots[player.inventory.currentGunIndex].type;
+    lastEquipmentState = MapGunToEquip(startGun);
     
     // Reset Visited Zones (Fog of War)
     for (int i = 0; i < 7; i++) visitedZones[i] = false;
@@ -216,7 +224,7 @@ void StartLevel(int id) {
     // Init Player Render
     PlayerRender_Init(&playerRender);
     PlayerRender_LoadEpisodeAssets(&playerRender);
-    PlayerRender_OnEquip(&playerRender, player.equipmentState);
+    PlayerRender_OnEquip(&playerRender, lastEquipmentState);
 }
 
 void Game_Init(void) {
@@ -303,6 +311,15 @@ static void DrawMenu(void) {
 // Developer Mode
 static bool developerMode = false;
 
+// Helper to map GunType to legacy PlayerEquipState for rendering
+static PlayerEquipState MapGunToEquip(GunType type) {
+    if (type == GUN_HANDGUN) return PLAYER_EQUIP_HANDGUN;
+    if (type == GUN_RIFLE) return PLAYER_EQUIP_RIFLE;
+    if (type == GUN_SHOTGUN) return PLAYER_EQUIP_SHOTGUN;
+    if (type == GUN_KNIFE) return PLAYER_EQUIP_KNIFE;
+    return PLAYER_EQUIP_BARE_HANDS; 
+}
+
 static void UpdateGame(float dt) {
     // Update Camera Offset
     camera.offset = (Vector2){ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f };
@@ -374,19 +391,57 @@ static void UpdateGame(float dt) {
         return; // Don't update player or enemies yet
     }
     
-    // Helper function to check if player has a gun equipped
-    bool hasGunEquipped = (player.equipmentState == PLAYER_EQUIP_HANDGUN ||
-                          player.equipmentState == PLAYER_EQUIP_RIFLE ||
-                          player.equipmentState == PLAYER_EQUIP_SHOTGUN);
+    // --- INVENTORY INPUTS ---
+    // Gun Switching
+    if (IsKeyPressed(KEY_ONE)) player.inventory.currentGunIndex = 0;
+    if (IsKeyPressed(KEY_TWO)) player.inventory.currentGunIndex = 1;
+    if (IsKeyPressed(KEY_THREE)) player.inventory.currentGunIndex = 2;
+
+    // Mask Switching
+    if (IsKeyPressed(KEY_FOUR)) player.inventory.currentMaskIndex = 0;
+    if (IsKeyPressed(KEY_FIVE)) player.inventory.currentMaskIndex = 1;
+    if (IsKeyPressed(KEY_SIX)) player.inventory.currentMaskIndex = 2;
+
+    Gun *currentGun = &player.inventory.gunSlots[player.inventory.currentGunIndex];
+    Mask *currentMask = &player.inventory.maskSlots[player.inventory.currentMaskIndex];
+
+    // Mask Interaction
+    if (IsKeyPressed(KEY_P)) {
+        if (currentMask->type != MASK_NONE) {
+            currentMask->isActive = !currentMask->isActive;
+        }
+    }
+    if (IsKeyPressed(KEY_G)) {
+        if (currentMask->type != MASK_NONE) {
+            currentMask->type = MASK_NONE;
+            currentMask->isActive = false;
+        }
+    }
+
+    // Update Mask Timers
+    for(int i=0; i<3; i++) {
+        if (player.inventory.maskSlots[i].isActive) {
+             player.inventory.maskSlots[i].currentTimer -= dt;
+             if (player.inventory.maskSlots[i].currentTimer <= 0) {
+                 player.inventory.maskSlots[i].isActive = false;
+                 player.inventory.maskSlots[i].type = MASK_NONE; // Break
+             }
+        }
+    }
+    
+    bool hasGunEquipped = (currentGun->type != GUN_NONE && currentGun->type != GUN_KNIFE);
 
     // Player Update
     UpdatePlayer(&player, &currentLevel, dt, developerMode);
 
-    // Detect equipment changes
-    if (player.equipmentState != lastEquipmentState) {
+    // Map new inventory state to legacy renderer state
+    PlayerEquipState currentEquipState = MapGunToEquip(currentGun->type);
+    
+    // Detect equipment changes for renderer
+    if (currentEquipState != lastEquipmentState) {
         weaponShootTimer = 0.0f;
-        PlayerRender_OnEquip(&playerRender, player.equipmentState);
-        lastEquipmentState = player.equipmentState;
+        PlayerRender_OnEquip(&playerRender, currentEquipState);
+        lastEquipmentState = currentEquipState;
     }
 
     // Camera Update
@@ -412,39 +467,36 @@ static void UpdateGame(float dt) {
     }
 
     // Update all player visual animation state
-    PlayerRender_Update(&playerRender, &player, dt, weaponShootTimer);
+    PlayerRender_Update(&playerRender, &player, lastEquipmentState, dt, weaponShootTimer);
     
     // Handle reload timer
     if (player.isReloading) {
         player.reloadTimer -= dt;
         if (player.reloadTimer <= 0.0f) {
             // Reload complete
-            int ammoNeeded = MAG_SIZE - player.magAmmo;
-            int ammoToTransfer = ammoNeeded < player.reserveAmmo ? ammoNeeded : player.reserveAmmo;
-            player.magAmmo += ammoToTransfer;
-            player.reserveAmmo -= ammoToTransfer;
+            int ammoNeeded = currentGun->maxAmmo - currentGun->currentAmmo;
+            int ammoToTransfer = ammoNeeded < currentGun->reserveAmmo ? ammoNeeded : currentGun->reserveAmmo;
+            currentGun->currentAmmo += ammoToTransfer;
+            currentGun->reserveAmmo -= ammoToTransfer;
             player.isReloading = false;
             player.reloadTimer = 0.0f;
         }
     }
+    // --- LOGIC RESTORED ---
 
-    // Reload input (R key)
-    if (IsKeyPressed(KEY_R) && !player.isReloading) {
-        bool canReload = hasGunEquipped && player.magAmmo < MAG_SIZE && player.reserveAmmo > 0;
-        if (canReload) {
-            player.isReloading = true;
-            player.reloadTimer = RELOAD_DURATION;
-        }
+    // 1. Update Enemies
+    for (int i = 0; i < currentLevel.enemyCount; i++) {
+        UpdateEnemy(&currentLevel.enemies[i], player.position, &currentLevel, bullets, MAX_BULLETS, dt);
     }
 
-    // Player Shooting
+    // 2. Player Shooting
     bool shootPressed = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
     if (shootPressed) {
-        bool canShoot = hasGunEquipped && HasAbility(player.identity, ABILITY_SHOOT) && !player.isReloading;
+        bool canShoot = hasGunEquipped && !player.isReloading && weaponShootTimer <= 0;
         
         if (canShoot) {
-            if (player.magAmmo > 0) {
-                // Shoot
+            if (currentGun->currentAmmo > 0) {
+                // Spawn Bullet
                 for (int i = 0; i < MAX_BULLETS; i++) {
                     if (!bullets[i].active) {
                         bullets[i].active = true;
@@ -453,25 +505,35 @@ static void UpdateGame(float dt) {
                         bullets[i].lifeTime = BULLET_LIFETIME;
                         bullets[i].isPlayerOwned = true;
                         bullets[i].velocity = Vector2Scale(aimDirNormalized, BULLET_SPEED);
-                        weaponShootTimer = weaponShootHold;
-                        player.magAmmo--;
+                        
+                        currentGun->currentAmmo--;
+                        weaponShootTimer = currentGun->cooldown;
+                        PlaySound(fxShoot); // Ensure sound plays if loaded
                         break;
                     }
                 }
+                
+                // Auto-reload check
+                if (currentGun->currentAmmo == 0 && currentGun->reserveAmmo > 0) {
+                     player.isReloading = true;
+                     player.reloadTimer = currentGun->reloadTime;
+                }
             } else {
-                // Auto-reload
-                if (player.reserveAmmo > 0) {
-                    player.isReloading = true;
-                    player.reloadTimer = RELOAD_DURATION;
+                // Click empty, try reload
+                if (currentGun->reserveAmmo > 0) {
+                     player.isReloading = true;
+                     player.reloadTimer = currentGun->reloadTime;
                 }
             }
+        } else if (currentGun->type == GUN_KNIFE && weaponShootTimer <= 0) {
+             // Knife attack (visual only here, logic is melee below)
+             weaponShootTimer = currentGun->cooldown; 
         }
     }
 
+    // 3. Melee Logic (Knife / Stealth Kill)
     meleeTargetIndex = -1;
-    if (player.equipmentState == PLAYER_EQUIP_KNIFE || 
-        player.equipmentState == PLAYER_EQUIP_FLASHLIGHT ||
-        player.equipmentState == PLAYER_EQUIP_BARE_HANDS) {
+    if (currentGun->type == GUN_KNIFE || currentGun->type == GUN_NONE) {
         meleeTargetIndex = PlayerActions_GetClosestEnemyInRange(&currentLevel, player.position, meleeRange);
         if (meleeTargetIndex != -1 && IsKeyPressed(KEY_E)) {
             PlayerActions_HandleEnemyKilled(&currentLevel,
@@ -479,92 +541,234 @@ static void UpdateGame(float dt) {
                                             &player,
                                             droppedMasks,
                                             MAX_MASKS,
-                                            droppedMaskRadius);
+                                            droppedMaskRadius,
+                                            droppedCards,
+                                            MAX_CARDS,
+                                            droppedGuns,
+                                            MAX_DROPPED_GUNS);
             meleeTargetIndex = -1;
         }
     }
 
-    // Enemy Update
-    for (int i = 0; i < currentLevel.enemyCount; i++) {
-        UpdateEnemy(&currentLevel.enemies[i], player.position, &currentLevel, bullets, MAX_BULLETS, dt);
-    }
-
-    // Bullet Updates & Collisions
+    // 4. Update Bullets
     for (int i = 0; i < MAX_BULLETS; i++) {
         if (!bullets[i].active) continue;
 
+        // Move
         bullets[i].position = Vector2Add(bullets[i].position, Vector2Scale(bullets[i].velocity, dt));
         bullets[i].lifeTime -= dt;
 
-        // Check Wall Collisions
+        bool hit = false;
+        // Wall Collision
         for (int w = 0; w < currentLevel.wallCount; w++) {
             if (CheckCollisionCircleRec(bullets[i].position, bullets[i].radius, currentLevel.walls[w])) {
-                bullets[i].active = false;
+                hit = true; break;
             }
         }
-        // Check Door Collisions
-        for (int d = 0; d < currentLevel.doorCount; d++) {
-            if (CheckCollisionCircleRec(bullets[i].position, bullets[i].radius, currentLevel.doors[d])) {
-                bullets[i].active = false;
+        // Door Collision (Closed)
+        if (!hit) {
+            for (int d = 0; d < currentLevel.doorCount; d++) {
+                if (!currentLevel.doorsOpen[d] &&
+                    CheckCollisionCircleRec(bullets[i].position, bullets[i].radius, currentLevel.doors[d])) {
+                    hit = true; break;
+                }
             }
         }
-        if (!bullets[i].active) continue;
 
+        if (hit || bullets[i].lifeTime <= 0) {
+            bullets[i].active = false;
+            continue;
+        }
+
+        // Entity Collision
         if (bullets[i].isPlayerOwned) {
-            // Check against Enemies
+            // Hit Enemy?
             for (int e = 0; e < currentLevel.enemyCount; e++) {
-                if (currentLevel.enemies[e].active &&
-                    CheckCollisionCircles(bullets[i].position, bullets[i].radius,
-                                          currentLevel.enemies[e].position, currentLevel.enemies[e].radius)) {
-                    bullets[i].active = false;
-                    PlayerActions_HandleEnemyKilled(&currentLevel,
-                                                    e,
-                                                    &player,
-                                                    droppedMasks,
-                                                    MAX_MASKS,
-                                                    droppedMaskRadius);
+                if (currentLevel.enemies[e].active) {
+                    if (CheckCollisionCircles(bullets[i].position, bullets[i].radius, currentLevel.enemies[e].position, currentLevel.enemies[e].radius)) {
+                        // Kill Enemy
+                        PlayerActions_HandleEnemyKilled(&currentLevel, e, &player, droppedMasks, MAX_MASKS, droppedMaskRadius, droppedCards, MAX_CARDS, droppedGuns, MAX_DROPPED_GUNS);
+                        bullets[i].active = false;
+                        break;
+                    }
                 }
             }
         } else {
-            // Check against Player
+            // Hit Player?
             if (CheckCollisionCircles(bullets[i].position, bullets[i].radius, player.position, player.radius)) {
-                if (!developerMode) {
-                    gameOver = true;
+                // Game Over
+                if (!developerMode) { // God mode check
+                    gameOver = true; 
+                    bullets[i].active = false;
                 }
-                bullets[i].active = false;
             }
         }
     }
 
-    // Mask Pickup
+    // 5. Mask Pickup
     for (int i = 0; i < MAX_MASKS; i++) {
         if (droppedMasks[i].active) {
             if (CheckCollisionCircles(player.position, player.radius, droppedMasks[i].position, droppedMasks[i].radius)) {
                 if (IsKeyPressed(KEY_SPACE)) {
-                    player.identity = droppedMasks[i].identity;
+                   // Pickup logic: Put in CURRENT slot
+                    int slot = player.inventory.currentMaskIndex;
+                    // Map dropped identity to mask type/ability
+                    MaskAbilityType mType = MASK_SPEED; 
+                    if (droppedMasks[i].identity.permissionLevel == PERM_ADMIN) mType = MASK_ADMIN;
+                    // Simple mapping for now
+                    
+                    player.inventory.maskSlots[slot].type = mType;
+                    player.inventory.maskSlots[slot].maxDuration = 30.0f; // 30s duration?
+                    player.inventory.maskSlots[slot].currentTimer = 30.0f;
+                    player.inventory.maskSlots[slot].isActive = false; 
+                    player.inventory.maskSlots[slot].collected = true;
+                    player.inventory.maskSlots[slot].color = droppedMasks[i].identity.color;
+                    
                     droppedMasks[i].active = false;
                 }
             }
         }
     }
 
-    // Door State Logic (Also respect Dev Mode)
-    for (int i = 0; i < currentLevel.doorCount; i++) {
-        bool sufficientPerm = player.identity.permissionLevel >= currentLevel.doorPerms[i];
-        if (developerMode) sufficientPerm = true; // Override in dev mode
-        
-        if (CheckCollisionCircleRec(player.position, player.radius, currentLevel.doors[i]) && sufficientPerm) {
-            currentLevel.doorsOpen[i] = true;
-        } else {
-            currentLevel.doorsOpen[i] = false;
+    
+    // 5.5 Card Pickup
+    for (int i = 0; i < MAX_CARDS; i++) {
+        if (droppedCards[i].active) {
+            if (CheckCollisionCircles(player.position, player.radius, droppedCards[i].position, droppedCards[i].radius)) {
+                // Determine if this card is better than what we have
+                if (droppedCards[i].identity.permissionLevel > player.inventory.card.level) {
+                     DrawText("PRESS SPACE TO PICKUP KEYCARD", (int)player.position.x - 50, (int)player.position.y - 40, 10, WHITE);
+                     if (IsKeyPressed(KEY_SPACE)) {
+                         player.inventory.card.level = droppedCards[i].identity.permissionLevel;
+                         droppedCards[i].active = false;
+                         // Play pickup sound?
+                     }
+                } else {
+                    // Already have better or equal, maybe just auto-collect or ignore?
+                    // Let's ignore for now but maybe show "ALREADY HAVE ACCESS"
+                }
+            }
         }
     }
 
-    // Win Condition
-    if (player.position.y > 2200.0f) {
+    // 5.6 Gun Pickup
+    for (int i = 0; i < MAX_DROPPED_GUNS; i++) {
+        if (droppedGuns[i].active) {
+            if (CheckCollisionCircles(player.position, player.radius, droppedGuns[i].position, droppedGuns[i].radius)) {
+                DrawText("PRESS SPACE TO PICKUP GUN", (int)player.position.x - 50, (int)player.position.y - 40, 10, PINK);
+                if (IsKeyPressed(KEY_SPACE)) {
+                    // Try to find empty slot
+                    int emptySlot = -1;
+                    for (int s=0; s<MAX_GUN_SLOTS; s++) {
+                        if (player.inventory.gunSlots[s].type == GUN_NONE) {
+                            emptySlot = s;
+                            break;
+                        }
+                    }
+                    
+                    if (emptySlot != -1) {
+                        // Take it
+                        player.inventory.gunSlots[emptySlot] = droppedGuns[i].gun;
+                        player.inventory.currentGunIndex = emptySlot; // Auto-switch?
+                        droppedGuns[i].active = false;
+                        PlaySound(fxReload); // Sound cue
+                    } else {
+                        // Swap with current
+                        Gun temp = player.inventory.gunSlots[player.inventory.currentGunIndex];
+                        
+                        // If current is None/Knife we might not want to swap if we logic'd emptySlot correctly above, 
+                        // but if we are "Full" with legit guns, we swap.
+                        // Wait, if current is Knife, is it a "Gun"? 
+                        // Our types says GUN_KNIFE. We usually don't drop knife.
+                        // So if we have Knife, we should just overwrite it if we treat it as a slot?
+                        // Or if we strictly follow 3 gun slots...
+                        // Let's assume we Swap.
+                        
+                        // We need to drop the current gun at player pos
+                        // But wait, we are inside the droppedGuns loop. 
+                        // We can just transform THIS dropped gun into the one we dropped?
+                        
+                        if (temp.type != GUN_NONE && temp.type != GUN_KNIFE) {
+                            player.inventory.gunSlots[player.inventory.currentGunIndex] = droppedGuns[i].gun;
+                            
+                            droppedGuns[i].gun = temp; // Swap data
+                            droppedGuns[i].position = player.position; // Move drop to feet
+                            // Keep active true
+                        } else {
+                            // If holding Knife, just take logic should have handled it? 
+                            // If slots are full with non-knives, we end up here.
+                            // If we hold Knife and slots are full (e.g. 3 rifles in inventory but holding knife?), 
+                            // we swap into current index?
+                            player.inventory.gunSlots[player.inventory.currentGunIndex] = droppedGuns[i].gun;
+                            droppedGuns[i].active = false; // Just take, don't drop knife
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // 5.7 Manual Gun Drop (Key Q)
+    if (IsKeyPressed(KEY_Q)) {
+        int idx = player.inventory.currentGunIndex;
+        Gun current = player.inventory.gunSlots[idx];
+        
+        if (current.type != GUN_NONE && current.type != GUN_KNIFE) {
+            // Find spot in droppedGuns
+            for (int i=0; i<MAX_DROPPED_GUNS; i++) {
+                if (!droppedGuns[i].active) {
+                    droppedGuns[i].active = true;
+                    droppedGuns[i].position = player.position;
+                    // Offset slightly forward?
+                    droppedGuns[i].position.x += 20 * player.identity.speed * dt * cosf(player.rotation * DEG2RAD); // Rough dir
+                    droppedGuns[i].position.y += 20 * player.identity.speed * dt * sinf(player.rotation * DEG2RAD);
+                    
+                    droppedGuns[i].radius = 15.0f;
+                    droppedGuns[i].gun = current;
+                    
+                    // Remove from inv
+                    player.inventory.gunSlots[idx].type = GUN_NONE;
+                    player.inventory.gunSlots[idx].active = false;
+                    
+                    break;
+                }
+            }
+        }
+    }
+
+    // 6. Door Logic
+    for (int i = 0; i < currentLevel.doorCount; i++) {
+        PermissionLevel myLevel = player.inventory.card.level;
+        // If mask active? 
+        // We need to check if active mask provides permission overrides?
+        // Or just use card level which should be updated if we assume card update logic exists.
+        // Wait, did we implement card update logic? 
+        // Previously card level was static or updated via 'identity'.
+        // Let's assume Mask/Identity swap updates card or we just use `player.identity.permissionLevel` if we were syncing it?
+        // The refactor moved to `player.inventory.card.level`.
+        // Let's rely on that.
+        
+        bool sufficientPerm = myLevel >= currentLevel.doorPerms[i];
+        if (developerMode) sufficientPerm = true; 
+        
+        if (CheckCollisionCircleRec(player.position, player.radius + 10.0f, currentLevel.doors[i]) && sufficientPerm) {
+            currentLevel.doorsOpen[i] = true;
+        } else {
+            // Only close if player is far enough? Or auto close.
+            // Simple auto - check if player is NOT in it.
+            if (!CheckCollisionCircleRec(player.position, player.radius + 5.0f, currentLevel.doors[i])) {
+                 currentLevel.doorsOpen[i] = false;
+            }
+        }
+    }
+
+    // Check Win Condition (Reach Win Area or Enemies Cleared? or Zone 7?)
+    // For Episode 1, let's say reach Zone 7 bottom? 
+    if (player.position.y > 2000.0f) {
         gameWon = true;
     }
-}
+
+} // End UpdateGame
 
 static void DrawGame(void) {
     BeginDrawing();
@@ -709,7 +913,33 @@ static void DrawGame(void) {
         for (int i = 0; i < MAX_MASKS; i++) {
             if (droppedMasks[i].active) {
                 DrawCircleV(droppedMasks[i].position, droppedMasks[i].radius, droppedMasks[i].identity.color);
+                DrawText("MASK", (int)droppedMasks[i].position.x - 10, (int)droppedMasks[i].position.y - 10, 8, WHITE);
                 DrawText("PRESS SPACE", (int)droppedMasks[i].position.x - 30, (int)droppedMasks[i].position.y - 30, 10, WHITE);
+            }
+        }
+
+        // Cards
+        for (int i = 0; i < MAX_CARDS; i++) {
+            if (droppedCards[i].active) {
+                // Draw a rectangle card
+                Rectangle cardRect = { droppedCards[i].position.x - 8, droppedCards[i].position.y - 5, 16, 10 };
+                DrawRectangleRec(cardRect, droppedCards[i].identity.color);
+                DrawRectangleLinesEx(cardRect, 1, WHITE);
+                DrawText("CARD", (int)droppedCards[i].position.x - 10, (int)droppedCards[i].position.y - 15, 8, WHITE);
+            }
+        }
+
+        // Dropped Guns
+        for (int i = 0; i < MAX_DROPPED_GUNS; i++) {
+            if (droppedGuns[i].active) {
+                // Determine text/color
+                Color gunCol = ORANGE;
+                const char* txt = "GUN";
+                if (droppedGuns[i].gun.type == GUN_HANDGUN) { txt = "Pistol"; gunCol = GOLD; }
+                else if (droppedGuns[i].gun.type == GUN_RIFLE) { txt = "Rifle"; gunCol = LIME; }
+                
+                DrawCircleV(droppedGuns[i].position, droppedGuns[i].radius, gunCol);
+                DrawText(txt, (int)droppedGuns[i].position.x - 20, (int)droppedGuns[i].position.y - 20, 10, WHITE);
             }
         }
 
@@ -720,8 +950,8 @@ static void DrawGame(void) {
 
         // Player
         if (playerRender.loaded) {
-            PlayerRender_Draw(&playerRender, &player);
-            PlayerRender_DrawMuzzleFlash(&playerRender, &player, weaponShootTimer);
+            PlayerRender_Draw(&playerRender, &player, lastEquipmentState);
+            PlayerRender_DrawMuzzleFlash(&playerRender, &player, lastEquipmentState, weaponShootTimer);
         } else {
             PlayerRender_DrawFallback(player.position, player.radius); // Fallback if not loaded
         }

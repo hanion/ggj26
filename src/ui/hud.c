@@ -1,6 +1,6 @@
 #include "hud.h"
 
-#include "../raylib/src/raylib.h"
+#include "../../raylib/src/raylib.h"
 
 // --- Profile portrait (top-left) ---
 static Texture2D playerProfileTexture;
@@ -105,8 +105,11 @@ static void DrawPlayerProfileHUD(Vector2 topLeft) {
             src.height = newH;
         }
 
+        // Raylib doesn't support arbitrary (triangle) clipping; draw full portrait into a rect
+        // then cover corners with triangles to create a "triangular" feel.
+        //BeginScissorMode((int)dst.x, (int)dst.y, (int)dst.width, (int)dst.height);
         DrawTexturePro(playerProfileTexture, src, dst, (Vector2){0, 0}, 0.0f, WHITE);
-        
+        //EndScissorMode();
 
         Color cover = Fade(BLACK, 0.55f);
         // Bottom-left cut
@@ -167,36 +170,69 @@ void Hud_DrawPlayer(const Entity *player) {
     const float lineY0 = topLeft.y;
     const float lineGap = 36.0f;
 
-    bool hasGunEquipped = (player->equipmentState == PLAYER_EQUIP_HANDGUN ||
-                          player->equipmentState == PLAYER_EQUIP_RIFLE ||
-                          player->equipmentState == PLAYER_EQUIP_SHOTGUN);
+    const Inventory *inv = &player->inventory;
+    const Gun *currentGun = &inv->gunSlots[inv->currentGunIndex];
+    
+    bool hasGunEquipped = (currentGun->type != GUN_NONE && currentGun->type != GUN_KNIFE);
 
-    // Row 1: Level icon + level text
+    // Row 1: Level/Card icon + level text
     DrawHudIconRow((Vector2){iconStartX, lineY0 + 0.0f},
                    hudLevelTexture,
-                   TextFormat("LEVEL: %d", player->identity.permissionLevel));
+                   TextFormat("ACCESS: %d", inv->card.level));
 
     // Row 2: Weapon icon + weapon text
-    const char *weaponText = "WEAPON HANDS";
-    switch (player->equipmentState) {
-        case PLAYER_EQUIP_KNIFE: weaponText = "WEAPON KNIFE"; break;
-        case PLAYER_EQUIP_FLASHLIGHT: weaponText = "WEAPON FLASHLIGHT"; break;
-        case PLAYER_EQUIP_HANDGUN: weaponText = "WEAPON HANDGUN"; break;
-        case PLAYER_EQUIP_RIFLE: weaponText = "WEAPON RIFLE"; break;
-        case PLAYER_EQUIP_SHOTGUN: weaponText = "WEAPON SHOTGUN"; break;
-        default: weaponText = "WEAPON HANDS"; break;
+    const char *weaponText = "HANDS";
+    switch (currentGun->type) {
+        case GUN_KNIFE: weaponText = "KNIFE"; break;
+        case GUN_HANDGUN: weaponText = "HANDGUN"; break;
+        case GUN_RIFLE: weaponText = "RIFLE"; break;
+        case GUN_SHOTGUN: weaponText = "SHOTGUN"; break;
+        default: weaponText = "HANDS"; break;
     }
+    // Indicate slot
     DrawHudIconRow((Vector2){iconStartX, lineY0 + lineGap},
                    hudWeaponTexture,
-                   TextFormat("%s", weaponText));
+                   TextFormat("[%d] %s", inv->currentGunIndex + 1, weaponText));
 
-    // Row 3: Bullet icon + ammo text (only when player has a gun)
+    // Row 3: Bullet icon + ammo text (only when player has a gun/knife?)
+    // Show ammo for guns
     if (hasGunEquipped) {
         DrawHudIconRow((Vector2){iconStartX, lineY0 + lineGap * 2.0f},
                        hudBulletTexture,
-                       TextFormat("BULLET: %d / %d", player->magAmmo, player->reserveAmmo));
+                       TextFormat("AMMO: %d / %d", currentGun->currentAmmo, currentGun->reserveAmmo));
         if (player->isReloading) {
-            DrawText("RELOADING...", (int)iconStartX, (int)(lineY0 + lineGap * 3.0f + 20.0f), 22, YELLOW);
+            DrawText("RELOAD", (int)iconStartX + 200, (int)(lineY0 + lineGap * 2.0f), 22, YELLOW);
+        }
+    } else if (currentGun->type == GUN_KNIFE) {
+        DrawHudIconRow((Vector2){iconStartX, lineY0 + lineGap * 2.0f},
+                       hudBulletTexture,
+                       "Inf");
+    }
+
+    // Row 4: Masks visualization
+    float maskY = lineY0 + lineGap * 3.5f;
+    DrawText("MASKS [4-6]:", (int)iconStartX, (int)maskY, 20, LIGHTGRAY);
+    for (int i=0; i<3; i++) {
+        Color slotColor = DARKGRAY;
+        if (inv->maskSlots[i].collected) {
+            slotColor = inv->maskSlots[i].color; 
+            if (i == inv->currentMaskIndex) slotColor = ColorBrightness(slotColor, 0.3f); // Highlight selected
+        }
+        
+        // Draw slot box
+        float slotSize = 30.0f;
+        float slotX = iconStartX + 120 + i * (slotSize + 10);
+        DrawRectangle((int)slotX, (int)maskY, (int)slotSize, (int)slotSize, slotColor);
+        DrawRectangleLines((int)slotX, (int)maskY, (int)slotSize, (int)slotSize, WHITE);
+
+        if (i == inv->currentMaskIndex) {
+            DrawRectangleLinesEx((Rectangle){slotX-2, maskY-2, slotSize+4, slotSize+4}, 2.0f, GOLD);
+        }
+
+        // Timer bar
+        if (inv->maskSlots[i].isActive) {
+            float pct = inv->maskSlots[i].currentTimer / inv->maskSlots[i].maxDuration;
+            DrawRectangle((int)slotX, (int)(maskY + slotSize + 2), (int)(slotSize * pct), 5, GREEN);
         }
     }
 }

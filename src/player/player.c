@@ -2,16 +2,35 @@
 #include "../../raylib/src/raymath.h"
 
 Entity InitPlayer(Vector2 spawnPos, Identity startIdentity) {
-  Entity player = {.position = spawnPos,
-                   .active = true,
-                   .identity = startIdentity,
-                   .isPlayer = true,
-                   .radius = 20.0f,
-                   .shootTimer = 0.0f,
-                   .magAmmo = 12,      // Default mag size
-                   .reserveAmmo = 48,  // Default reserve ammo
-                   .isReloading = false,
-                   .reloadTimer = 0.0f};
+  Entity player = {0};
+  player.position = spawnPos;
+  player.active = true;
+  player.identity = startIdentity;
+  player.isPlayer = true;
+  player.radius = 20.0f;
+  player.shootTimer = 0.0f;
+  
+  // INIT INVENTORY
+  // Slot 0: Knife
+  player.inventory.gunSlots[0].type = GUN_KNIFE;
+  player.inventory.gunSlots[0].active = true;
+  player.inventory.gunSlots[0].damage = 10.0f;
+  player.inventory.gunSlots[0].range = 80.0f;
+  player.inventory.gunSlots[0].cooldown = 0.5f;
+
+  // Empty other slots
+  player.inventory.gunSlots[1].type = GUN_NONE;
+  player.inventory.gunSlots[2].type = GUN_NONE;
+  player.inventory.currentGunIndex = 0;
+
+  // Empty masks
+  for(int i=0; i<3; i++) player.inventory.maskSlots[i].type = MASK_NONE;
+  player.inventory.currentMaskIndex = 0;
+
+  // Card
+  player.inventory.card.level = PERM_NONE;
+  player.inventory.card.collected = false;
+
   return player;
 }
 
@@ -48,9 +67,10 @@ void UpdatePlayer(Entity *player, Level *currentLevel, float dt, bool godMode) {
     }
 
     if (!godMode) {
+        PermissionLevel myLevel = player->inventory.card.level;
         for (int i = 0; i < currentLevel->doorCount && !blocked_x; i++) {
           if (CheckCollisionCircleRec(xPos, player->radius, currentLevel->doors[i])) {
-            if (player->identity.permissionLevel < currentLevel->doorPerms[i]) {
+            if (myLevel < currentLevel->doorPerms[i]) {
               blocked_x = true;
             }
           }
@@ -84,9 +104,10 @@ void UpdatePlayer(Entity *player, Level *currentLevel, float dt, bool godMode) {
     }
 
     if (!godMode) {
+        PermissionLevel myLevel = player->inventory.card.level;
         for (int i = 0; i < currentLevel->doorCount && !blocked_y; i++) {
           if (CheckCollisionCircleRec(yPos, player->radius, currentLevel->doors[i])) {
-            if (player->identity.permissionLevel < currentLevel->doorPerms[i]) {
+            if (myLevel < currentLevel->doorPerms[i]) {
               blocked_y = true;
             }
           }

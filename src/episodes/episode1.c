@@ -12,25 +12,25 @@
   
 void InitEpisode1(Level *level) {
   // Identities - Unique Keys per Zone
-  Identity idCivilian = {.permissionLevel = PERM_CIVILIAN, .abilities = ABILITY_SHOOT, .color = BLUE, .speed = 220.0f};
+  Identity idCivilian = {.permissionLevel = PERM_NONE, .color = BLUE, .speed = 220.0f};
   
   // Z1 Key: Staff (Green) - Opens D1
-  Identity idKeyZ1 = {.permissionLevel = PERM_STAFF, .abilities = ABILITY_SHOOT, .color = GREEN, .speed = 210.0f};
+  Identity idKeyZ1 = {.permissionLevel = PERM_STAFF, .color = GREEN, .speed = 210.0f};
   
   // Z2 Key: Guard (Red) - Opens D2
-  Identity idKeyZ2 = {.permissionLevel = PERM_GUARD, .abilities = ABILITY_SHOOT | ABILITY_PUNCH, .color = RED, .speed = 200.0f};
+  Identity idKeyZ2 = {.permissionLevel = PERM_GUARD, .color = RED, .speed = 200.0f};
 
   // Z3 Key: Admin (Purple) - Opens D3
-  Identity idKeyZ3 = {.permissionLevel = PERM_ADMIN, .abilities = ABILITY_SHOOT | ABILITY_PUNCH | ABILITY_DASH, .color = PURPLE, .speed = 250.0f};
+  Identity idKeyZ3 = {.permissionLevel = PERM_ADMIN, .color = PURPLE, .speed = 250.0f};
 
   // Z4 Key: Guard (Red) - Opens D4 (reusing type but unique var if needed, or just reuse)
-  Identity idKeyZ4 = {.permissionLevel = PERM_GUARD, .abilities = ABILITY_SHOOT, .color = RED, .speed = 200.0f};
+  Identity idKeyZ4 = {.permissionLevel = PERM_GUARD, .color = RED, .speed = 200.0f};
 
   // Z5 Key: Staff (Green) - Opens D5
-  Identity idKeyZ5 = {.permissionLevel = PERM_STAFF, .abilities = ABILITY_SHOOT, .color = GREEN, .speed = 210.0f};
+  Identity idKeyZ5 = {.permissionLevel = PERM_STAFF, .color = GREEN, .speed = 210.0f};
 
   // Z6 Key: Admin (Purple) - Opens D6
-  Identity idKeyZ6 = {.permissionLevel = PERM_ADMIN, .abilities = ABILITY_SHOOT | ABILITY_DASH, .color = PURPLE, .speed = 250.0f};
+  Identity idKeyZ6 = {.permissionLevel = PERM_ADMIN, .color = PURPLE, .speed = 250.0f};
 
   // 7 Zones (Exact Texture sizes)
   // Z1: (0, 0)         [913x642]

@@ -80,15 +80,15 @@ void PlayerRender_LoadEpisodeAssets(PlayerRender *pr);
 void PlayerRender_Unload(PlayerRender *pr);
 
 // Call every frame after player movement/rotation have been updated.
-void PlayerRender_Update(PlayerRender *pr, const Entity *player, float dt, float weaponShootTimer);
+void PlayerRender_Update(PlayerRender *pr, const Entity *player, PlayerEquipState currentEquip, float dt, float weaponShootTimer);
 
 // Notify when equipment changes (so visual picks a new idle pose).
 void PlayerRender_OnEquip(PlayerRender *pr, PlayerEquipState equip);
 
 // Draw shadow + feet + weapon at player.position with player.rotation.
-void PlayerRender_Draw(const PlayerRender *pr, const Entity *player);
+void PlayerRender_Draw(const PlayerRender *pr, const Entity *player, PlayerEquipState currentEquip);
 
 // Draw muzzle flash when shooting
-void PlayerRender_DrawMuzzleFlash(const PlayerRender *pr, const Entity *player, float weaponShootTimer);
+void PlayerRender_DrawMuzzleFlash(const PlayerRender *pr, const Entity *player, PlayerEquipState currentEquip, float weaponShootTimer);
 
 #endif
