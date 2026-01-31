@@ -623,7 +623,25 @@ static void DrawGame(void) {
 
         if (currentLevel.id == 1) {
              DrawText("ZONE 1: STAFF ONLY", 400, 300, 30, Fade(WHITE, 0.1f));
-             DrawText("EXIT", 480, 2340, 40, Fade(GREEN, 0.5f));
+             // Animated "EXIT" Text
+             float time = (float)GetTime();
+             float rotation = sinf(time * 2.0f) * 10.0f; // Rock back and forth +/- 10 degrees
+             float scale = 1.0f + sinf(time * 5.0f) * 0.1f; // Pulse scale
+             
+             // Burning/Flashing Color
+             Color c1 = ORANGE;
+             Color c2 = RED;
+             float t = (sinf(time * 8.0f) + 1.0f) / 2.0f;
+             Color burnColor = (Color){
+                (unsigned char)(c1.r + t*(c2.r - c1.r)),
+                (unsigned char)(c1.g + t*(c2.g - c1.g)),
+                (unsigned char)(c1.b + t*(c2.b - c1.b)),
+                255
+             };
+
+             Vector2 textSize = MeasureTextEx(GetFontDefault(), "EXIT", 40, 4);
+             Vector2 origin = { textSize.x / 2, textSize.y / 2 };
+             DrawTextPro(GetFontDefault(), "EXIT", (Vector2){480 + origin.x, 2340 + origin.y}, origin, rotation, 40 * scale, 4, burnColor);
         }
 
         // Enemies
