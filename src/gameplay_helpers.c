@@ -51,4 +51,24 @@ void Gameplay_HandleEnemyKilled(Level *level,
     }
 }
 
+int Gameplay_GetClosestDoor(const Level *level, Vector2 position) {
+    if (!level || level->doorCount <= 0) return -1;
+
+    int closestIdx = -1;
+    float closestDistSqr = 99999999.0f;
+
+    for (int i = 0; i < level->doorCount; i++) {
+        Vector2 center = { 
+            level->doors[i].x + level->doors[i].width/2,
+            level->doors[i].y + level->doors[i].height/2
+        };
+        float d2 = Vector2DistanceSqr(position, center);
+        if (d2 < closestDistSqr) {
+            closestDistSqr = d2;
+            closestIdx = i;
+        }
+    }
+    return closestIdx;
+}
+
 

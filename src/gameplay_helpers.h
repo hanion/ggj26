@@ -16,6 +16,8 @@ void Gameplay_HandleEnemyKilled(Level *level,
                                bool *maskActive,
                                float droppedMaskRadius);
 
+int Gameplay_GetClosestDoor(const Level *level, Vector2 position);
+
 // Raycasts against walls/doors and returns the hit point (or end if no hit)
 // Raycasts against walls/doors and returns the hit point (or end if no hit)
 static inline Vector2 Gameplay_GetRayHit(Vector2 start, Vector2 end, const Level *level) {
