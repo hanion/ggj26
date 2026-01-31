@@ -58,6 +58,11 @@ typedef struct {
   bool isInvisible;
   bool haveMask; // Determines if this enemy drops a mask
   float IGotHitImSearchingThePlayerForHowManySeconds; // Hit reaction search duration
+  
+  // Choking State
+  bool isChoking;
+  float chokeTimer;
+  int chokeTargetIndex;
 } Entity;
 
 typedef struct {
