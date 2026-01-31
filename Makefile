@@ -2,6 +2,11 @@ CC = gcc
 
 # Common flags
 CFLAGS = -I./raylib/src -Isrc
+
+# Developer build flag (0 = players, 1 = developers)
+# Usage: make DEV_MODE=1
+DEV_MODE ?= 0
+CFLAGS += -DDEV_MODE=$(DEV_MODE)
 LDFLAGS = -L./raylib/src -lraylib
 
 ifeq ($(OS),Windows_NT)
