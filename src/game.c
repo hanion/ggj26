@@ -19,6 +19,14 @@
 #define BULLET_RADIUS 5.0f
 #define BULLET_LIFETIME 2.0f
 
+// Ammo Constants
+#define MAG_SIZE 12
+#define INITIAL_RESERVE_AMMO 48
+
+// Muzzle Flash Offset Constants
+#define MUZZLE_OFFSET_X 40.0f
+#define MUZZLE_OFFSET_Y -10.0f
+
 // --- GAME STATE ---
 typedef enum {
     STATE_MENU,
@@ -48,7 +56,8 @@ typedef enum {
     PLAYER_GUN_EQUIP,
     PLAYER_GUN_IDLE,
     PLAYER_GUN_WALK,
-    PLAYER_GUN_SHOOT
+    PLAYER_GUN_SHOOT,
+    PLAYER_GUN_RELOAD
 } PlayerGunAnimState;
 
 static AnimClip playerIdleClip;
@@ -56,17 +65,25 @@ static AnimClip playerWalkClip;
 static AnimClip playerGunIdleClip;
 static AnimClip playerGunWalkClip;
 static AnimClip playerGunShootClip;
+static AnimClip playerGunReloadClip;
 static AnimPlayer playerAnim;
 static AnimPlayer playerGunAnim;
 static Texture2D playerShadow;
+static Texture2D muzzleFlashTexture;
 static bool playerAnimLoaded;
 static bool playerGunAnimLoaded;
+static bool playerGunReloadAnimLoaded;
+static bool muzzleFlashLoaded;
 static PlayerAnimState playerAnimState;
 static PlayerGunAnimState playerGunAnimState;
 static const float playerSpriteScale = 0.3f;
 static const Vector2 playerSpritePivot = {0.5f, 0.5f};
 static const float playerGunShootHold = 0.2f;
 static float playerGunShootTimer = 0.0f;
+static const float muzzleFlashDuration = 0.05f;  // How long the muzzle flash is visible
+static float muzzleFlashTimer = 0.0f;
+static const float reloadTransferFrame = 0.7f;  // At 70% through reload, transfer ammo
+static bool reloadAmmoTransferred = false;
 static const float meleeRange = 80.0f;
 static const float meleePromptOffset = 25.0f;
 static const float meleePromptHorizontalOffset = 40.0f;
@@ -220,7 +237,11 @@ static void StartLevel(int episodeId) {
     player = InitPlayer(currentLevel.playerSpawn, currentLevel.playerStartId);
     player.equipmentState = PLAYER_EQUIP_BARE_HANDS;
     player.rotation = 0.0f;
+    player.magAmmo = MAG_SIZE;
+    player.reserveAmmo = INITIAL_RESERVE_AMMO;
     playerGunShootTimer = 0.0f;
+    muzzleFlashTimer = 0.0f;
+    reloadAmmoTransferred = false;
     lastEquipmentState = player.equipmentState;
 
     // Camera
@@ -245,17 +266,30 @@ static void StartLevel(int episodeId) {
         UnloadAnimClip(&playerGunShootClip);
         playerGunAnimLoaded = false;
     }
+    if (playerGunReloadAnimLoaded) {
+        UnloadAnimClip(&playerGunReloadClip);
+        playerGunReloadAnimLoaded = false;
+    }
+    if (muzzleFlashLoaded) {
+        UnloadTexture(muzzleFlashTexture);
+        muzzleFlashTexture = (Texture2D){0};
+        muzzleFlashLoaded = false;
+    }
     playerIdleClip = LoadAnimClip("assets/character/LightArtilleryRobot/idle60", 30.0f);
     playerWalkClip = LoadAnimClip("assets/character/LightArtilleryRobot/walk60", 60.0f);
     playerGunIdleClip = LoadAnimClip("assets/character/LightArtilleryRobot/idle60", 30.0f);
     playerGunWalkClip = LoadAnimClip("assets/character/LightArtilleryRobot/walk60", 60.0f);
     playerGunShootClip = LoadAnimClip("assets/character/LightArtilleryRobot/shootGun20", 60.0f);
+    playerGunReloadClip = LoadAnimClip("assets/character/LightArtilleryRobot/idle60", 30.0f);
     playerShadow = LoadTexture("assets/character/LightArtilleryRobot/shadow.png");
+    muzzleFlashTexture = LoadTexture("assets/effects/muzzle_flash_01.tga");
     playerAnimLoaded = playerIdleClip.frame_count > 0 && playerWalkClip.frame_count > 0 &&
                        playerShadow.id != 0;
     playerGunAnimLoaded = playerGunIdleClip.frame_count > 0 &&
                           playerGunWalkClip.frame_count > 0 &&
                           playerGunShootClip.frame_count > 0;
+    playerGunReloadAnimLoaded = playerGunReloadClip.frame_count > 0;
+    muzzleFlashLoaded = muzzleFlashTexture.id != 0;
     playerAnim = (AnimPlayer){0};
     playerGunAnim = (AnimPlayer){0};
     playerAnimState = PLAYER_ANIM_IDLE;
@@ -406,11 +440,38 @@ static void UpdateGame(float dt) {
             playerGunShootTimer = 0.0f;
         }
     }
+    if (muzzleFlashTimer > 0.0f) {
+        muzzleFlashTimer -= dt;
+        if (muzzleFlashTimer < 0.0f) {
+            muzzleFlashTimer = 0.0f;
+        }
+    }
 
     if (player.equipmentState == PLAYER_EQUIP_GUN && playerGunAnimLoaded) {
         // If we're in the one-shot equip anim, let it finish before entering idle/walk.
         if (playerGunAnimState == PLAYER_GUN_EQUIP) {
             AnimPlayer_Update(&playerGunAnim, dt);
+            if (AnimPlayer_IsFinished(&playerGunAnim)) {
+                playerGunAnimState = PLAYER_GUN_IDLE;
+                AnimPlayer_SetClip(&playerGunAnim, &playerGunIdleClip);
+                playerGunAnim.loop = true;
+            }
+        } else if (playerGunAnimState == PLAYER_GUN_RELOAD) {
+            // Handle reload animation
+            AnimPlayer_Update(&playerGunAnim, dt);
+            
+            // Transfer ammo at the right point in the animation
+            if (playerGunReloadAnimLoaded && !reloadAmmoTransferred) {
+                float progress = (float)playerGunAnim.frame_index / (float)playerGunReloadClip.frame_count;
+                if (progress >= reloadTransferFrame) {
+                    int ammoNeeded = MAG_SIZE - player.magAmmo;
+                    int ammoToTransfer = ammoNeeded < player.reserveAmmo ? ammoNeeded : player.reserveAmmo;
+                    player.magAmmo += ammoToTransfer;
+                    player.reserveAmmo -= ammoToTransfer;
+                    reloadAmmoTransferred = true;
+                }
+            }
+            
             if (AnimPlayer_IsFinished(&playerGunAnim)) {
                 playerGunAnimState = PLAYER_GUN_IDLE;
                 AnimPlayer_SetClip(&playerGunAnim, &playerGunIdleClip);
@@ -438,18 +499,48 @@ static void UpdateGame(float dt) {
     // Player Shooting
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         if (player.equipmentState == PLAYER_EQUIP_GUN && HasAbility(player.identity, ABILITY_SHOOT)) {
-            for (int i = 0; i < MAX_BULLETS; i++) {
-                if (!bullets[i].active) {
-                    bullets[i].active = true;
-                    bullets[i].position = player.position;
-                    bullets[i].radius = BULLET_RADIUS;
-                    bullets[i].lifeTime = BULLET_LIFETIME;
-                    bullets[i].isPlayerOwned = true;
-                    bullets[i].velocity = Vector2Scale(aimDirNormalized, BULLET_SPEED);
-                    playerGunShootTimer = playerGunShootHold;
-                    break;
+            // Can't shoot while reloading
+            if (playerGunAnimState != PLAYER_GUN_RELOAD) {
+                if (player.magAmmo > 0) {
+                    // Shoot bullet
+                    for (int i = 0; i < MAX_BULLETS; i++) {
+                        if (!bullets[i].active) {
+                            bullets[i].active = true;
+                            bullets[i].position = player.position;
+                            bullets[i].radius = BULLET_RADIUS;
+                            bullets[i].lifeTime = BULLET_LIFETIME;
+                            bullets[i].isPlayerOwned = true;
+                            bullets[i].velocity = Vector2Scale(aimDirNormalized, BULLET_SPEED);
+                            playerGunShootTimer = playerGunShootHold;
+                            muzzleFlashTimer = muzzleFlashDuration;
+                            player.magAmmo--;
+                            break;
+                        }
+                    }
+                } else {
+                    // Empty magazine - auto reload if we have reserve ammo
+                    if (player.reserveAmmo > 0 && playerGunReloadAnimLoaded) {
+                        playerGunAnimState = PLAYER_GUN_RELOAD;
+                        AnimPlayer_SetClip(&playerGunAnim, &playerGunReloadClip);
+                        playerGunAnim.loop = false;
+                        reloadAmmoTransferred = false;
+                    }
                 }
             }
+        }
+    }
+
+    // Reload handling
+    if (IsKeyPressed(KEY_R)) {
+        if (player.equipmentState == PLAYER_EQUIP_GUN && 
+            playerGunAnimState != PLAYER_GUN_RELOAD &&
+            player.magAmmo < MAG_SIZE && 
+            player.reserveAmmo > 0 &&
+            playerGunReloadAnimLoaded) {
+            playerGunAnimState = PLAYER_GUN_RELOAD;
+            AnimPlayer_SetClip(&playerGunAnim, &playerGunReloadClip);
+            playerGunAnim.loop = false;
+            reloadAmmoTransferred = false;
         }
     }
 
@@ -617,6 +708,35 @@ static void DrawGame(void) {
             } else {
                 DrawPlayerFallback(player.position, player.radius);
             }
+            
+            // Draw muzzle flash if active
+            if (muzzleFlashTimer > 0.0f && muzzleFlashLoaded) {
+                // Calculate muzzle flash position with offset based on aim direction
+                float aimRadians = (player.rotation - 90.0f) * DEG2RAD;
+                float facingX = cosf(aimRadians);
+                float facingY = sinf(aimRadians);
+                
+                // Apply offset in the direction the gun is facing
+                Vector2 flashPos = {
+                    player.position.x + facingX * MUZZLE_OFFSET_X + facingY * MUZZLE_OFFSET_Y,
+                    player.position.y + facingY * MUZZLE_OFFSET_X - facingX * MUZZLE_OFFSET_Y
+                };
+                
+                float flashScale = 0.5f;
+                Rectangle source = {0, 0, (float)muzzleFlashTexture.width, (float)muzzleFlashTexture.height};
+                Rectangle dest = {
+                    flashPos.x, 
+                    flashPos.y,
+                    muzzleFlashTexture.width * flashScale,
+                    muzzleFlashTexture.height * flashScale
+                };
+                Vector2 origin = {
+                    (muzzleFlashTexture.width * flashScale) / 2.0f,
+                    (muzzleFlashTexture.height * flashScale) / 2.0f
+                };
+                
+                DrawTexturePro(muzzleFlashTexture, source, dest, origin, player.rotation - 90.0f, WHITE);
+            }
         } else {
             DrawPlayerFallback(player.position, player.radius);
         }
@@ -644,6 +764,13 @@ static void DrawGame(void) {
                  20, 20, 20, WHITE);
         DrawText(player.equipmentState == PLAYER_EQUIP_GUN ? "EQUIP: GUN" : "EQUIP: HANDS",
                  20, 45, 16, WHITE);
+        if (player.equipmentState == PLAYER_EQUIP_GUN) {
+            DrawText(TextFormat("AMMO: %d / %d", player.magAmmo, player.reserveAmmo),
+                     20, 70, 16, WHITE);
+            if (playerGunAnimState == PLAYER_GUN_RELOAD) {
+                DrawText("RELOADING...", 20, 95, 16, YELLOW);
+            }
+        }
     }
 
     EndDrawing();

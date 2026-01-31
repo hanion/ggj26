@@ -23,6 +23,10 @@ typedef struct {
   float shootTimer; // For AI cooldown
 
   PlayerEquipState equipmentState;
+
+  // Ammo tracking for handgun
+  int magAmmo;     // Current ammo in magazine
+  int reserveAmmo; // Ammo in reserve
 } Entity;
 
 typedef struct {
