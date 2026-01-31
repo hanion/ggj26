@@ -602,10 +602,21 @@ static void DrawGame(void) {
             for (int i = 0; i < currentLevel.wallCount; i++) DrawRectangleRec(currentLevel.walls[i], Fade(RED, 0.5f));
         }
         for (int i = 0; i < currentLevel.doorCount; i++) {
+            Color doorColor = SKYBLUE;
+            if (currentLevel.doorPerms[i] == PERM_STAFF) doorColor = GREEN;
+            else if (currentLevel.doorPerms[i] == PERM_GUARD) doorColor = RED;
+            else if (currentLevel.doorPerms[i] == PERM_ADMIN) doorColor = PURPLE;
+
             if (!currentLevel.doorsOpen[i]) {
-                DrawRectangleRec(currentLevel.doors[i], Fade(BLUE, 0.3f));
+                DrawRectangleRec(currentLevel.doors[i], Fade(doorColor, 0.6f));
+                DrawRectangleLinesEx(currentLevel.doors[i], 2.0f, WHITE);
+                
+                // Draw a small lock icon visual (circle)
+                Vector2 center = { currentLevel.doors[i].x + currentLevel.doors[i].width/2, 
+                                   currentLevel.doors[i].y + currentLevel.doors[i].height/2 };
+                DrawCircleV(center, 4.0f, WHITE);
             } else {
-                DrawRectangleLinesEx(currentLevel.doors[i], 3.0f, GREEN);
+                DrawRectangleLinesEx(currentLevel.doors[i], 3.0f, Fade(doorColor, 0.5f));
             }
         }
 
