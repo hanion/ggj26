@@ -10,6 +10,10 @@ Entity InitEnemy(Vector2 position, EnemyType type) {
     enemy.isPlayer = false;
     enemy.radius = 20.0f;
     enemy.shootTimer = ENEMY_SHOOT_INTERVAL;
+    enemy.health = 100.0f;
+    enemy.health = 100.0f;
+    enemy.maxHealth = 100.0f;
+    enemy.IGotHitImSearchingThePlayerForHowManySeconds = 5.0f; // Default duration
 
     switch (type) {
         case ENEMY_CIVILIAN:

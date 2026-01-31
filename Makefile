@@ -36,7 +36,10 @@ SRC = src/main.c \
     src/anim.c \
     src/episodes/episode2.c \
     src/enemies/enemy_factory.c \
-    src/gameplay_helpers.c
+    src/gameplay_helpers.c \
+    src/masks/mask1.c \
+    src/masks/mask2.c \
+    src/masks/mask_manager.c
 
 ggj26: $(SRC)
 	$(CC) -o ggj26 $(SRC) $(CFLAGS) $(LDFLAGS) $(LIBS)
