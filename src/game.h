@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 void Game_Init(void);
-void Game_Update(void);
+bool Game_Update(void);
 void Game_Draw(void);
 void Game_Shutdown(void); // Optional, for cleanup
 
