@@ -68,8 +68,8 @@ bool CheckLineOfSight(Entity *enemy, Vector2 target, Level *level) {
     // Check Doors (Closed ones check)
     for (int i = 0; i < level->doorCount; i++) {
         // If door is closed, it blocks sight
-        if (!level->doorsOpen[i]) {
-            if (CheckCollisionSegmentRec(enemy->position, target, level->doors[i])) {
+        if (!level->doors[i].isOpen) {
+            if (CheckCollisionSegmentRec(enemy->position, target, level->doors[i].rect)) {
                 return false;
             }
         }
@@ -94,8 +94,8 @@ static bool MoveEnemyWithCollision(Entity *enemy, Vector2 delta, const Level *le
         }
     }
     for (int i = 0; i < level->doorCount && !blocked_x; i++) {
-        if (CheckCollisionCircleRec(enemy->position, enemy->radius, level->doors[i])) {
-             if (enemy->identity.permissionLevel < level->doorPerms[i] && !level->doorsOpen[i]) {
+        if (CheckCollisionCircleRec(enemy->position, enemy->radius, level->doors[i].rect)) {
+             if (enemy->identity.permissionLevel < level->doors[i].requiredPerm && !level->doors[i].isOpen) {
                 blocked_x = true;
             }
         }
@@ -117,8 +117,8 @@ static bool MoveEnemyWithCollision(Entity *enemy, Vector2 delta, const Level *le
         }
     }
     for (int i = 0; i < level->doorCount && !blocked_y; i++) {
-        if (CheckCollisionCircleRec(enemy->position, enemy->radius, level->doors[i])) {
-             if (enemy->identity.permissionLevel < level->doorPerms[i] && !level->doorsOpen[i]) {
+        if (CheckCollisionCircleRec(enemy->position, enemy->radius, level->doors[i].rect)) {
+             if (enemy->identity.permissionLevel < level->doors[i].requiredPerm && !level->doors[i].isOpen) {
                 blocked_y = true;
             }
         }
@@ -180,8 +180,8 @@ void UpdateEnemy(Entity *enemy, Vector2 playerPos, Level *level, Bullet *bulletP
               int doorIdx = Gameplay_GetClosestDoor(level, enemy->position);
               if (doorIdx != -1) {
                   Vector2 doorCenter = {
-                      level->doors[doorIdx].x + level->doors[doorIdx].width/2,
-                      level->doors[doorIdx].y + level->doors[doorIdx].height/2
+                      level->doors[doorIdx].rect.x + level->doors[doorIdx].rect.width/2,
+                      level->doors[doorIdx].rect.y + level->doors[doorIdx].rect.height/2
                   };
                   Vector2 toDoor = Vector2Subtract(doorCenter, enemy->position);
                   float targetAngle = atan2f(toDoor.y, toDoor.x) * RAD2DEG;

@@ -152,30 +152,30 @@ void InitEpisode1(Level *level) {
   // --- Doors ---
   level->doorCount = 6;
   // D1 (X=913)
-  level->doors[0] = (Rectangle){913, 260, 20, 120};
-  level->doorPerms[0] = PERM_STAFF;
+  level->doors[0].rect = (Rectangle){913, 260, 20, 120};
+  level->doors[0].requiredPerm = PERM_STAFF;
 
   // D2 (X=1824)
-  level->doors[1] = (Rectangle){1824, 260, 20, 120};
-  level->doorPerms[1] = PERM_GUARD;
+  level->doors[1].rect = (Rectangle){1824, 260, 20, 120};
+  level->doors[1].requiredPerm = PERM_GUARD;
 
   // D3 (Z3->Z4, Y=654)
-  level->doors[2] = (Rectangle){2124, 654, 120, 20};
-  level->doorPerms[2] = PERM_ADMIN;
+  level->doors[2].rect = (Rectangle){2124, 654, 120, 20};
+  level->doors[2].requiredPerm = PERM_ADMIN;
 
   // D4 (Z4->Z5, X=1824)
-  level->doors[3] = (Rectangle){1824, 914, 20, 120};
-  level->doorPerms[3] = PERM_GUARD;
+  level->doors[3].rect = (Rectangle){1824, 914, 20, 120};
+  level->doors[3].requiredPerm = PERM_GUARD;
 
   // D5 (Z5->Z6, X=957)
-  level->doors[4] = (Rectangle){957, 914, 20, 120};
-  level->doorPerms[4] = PERM_STAFF;
+  level->doors[4].rect = (Rectangle){957, 914, 20, 120};
+  level->doors[4].requiredPerm = PERM_STAFF;
 
   // D6 (Z6->Z7, Y=1507)
-  level->doors[5] = (Rectangle){462, 1507, 120, 20};
-  level->doorPerms[5] = PERM_ADMIN;
+  level->doors[5].rect = (Rectangle){462, 1507, 120, 20};
+  level->doors[5].requiredPerm = PERM_ADMIN;
   
-  for(int i=0; i<6; i++) level->doorsOpen[i] = false;
+  for(int i=0; i<6; i++) level->doors[i].isOpen = false;
 
   // --- Enemies (Unique Keys) ---
   level->enemyCount = 7;

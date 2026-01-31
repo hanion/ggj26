@@ -77,8 +77,8 @@ void UpdatePlayer(Entity *player, Level *currentLevel, float dt, bool godMode) {
     if (!godMode) {
         PermissionLevel myLevel = player->inventory.card.level;
         for (int i = 0; i < currentLevel->doorCount && !blocked_x; i++) {
-          if (CheckCollisionCircleRec(xPos, player->radius, currentLevel->doors[i])) {
-            if (myLevel < currentLevel->doorPerms[i]) {
+          if (CheckCollisionCircleRec(xPos, player->radius, currentLevel->doors[i].rect)) {
+            if (myLevel < currentLevel->doors[i].requiredPerm) {
               blocked_x = true;
             }
           }
@@ -114,8 +114,8 @@ void UpdatePlayer(Entity *player, Level *currentLevel, float dt, bool godMode) {
     if (!godMode) {
         PermissionLevel myLevel = player->inventory.card.level;
         for (int i = 0; i < currentLevel->doorCount && !blocked_y; i++) {
-          if (CheckCollisionCircleRec(yPos, player->radius, currentLevel->doors[i])) {
-            if (myLevel < currentLevel->doorPerms[i]) {
+          if (CheckCollisionCircleRec(yPos, player->radius, currentLevel->doors[i].rect)) {
+            if (myLevel < currentLevel->doors[i].requiredPerm) {
               blocked_y = true;
             }
           }
