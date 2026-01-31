@@ -321,8 +321,11 @@ static PlayerEquipState MapGunToEquip(GunType type) {
 }
 
 static void UpdateGame(float dt) {
-    // Update Camera Offset
-    camera.offset = (Vector2){ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f };
+	camera.offset = (Vector2){ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f };
+	float scale_x = GetScreenWidth()  / 1920.0f;
+	float scale_y = GetScreenHeight() / 1080.0f;
+	camera.zoom = 1.5f*fminf(scale_x, scale_y);
+
 
     // Debug Toggle F1
     if (IsKeyPressed(KEY_F1)) {
