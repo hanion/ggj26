@@ -30,35 +30,60 @@ void UpdatePlayer(Entity *player, Level *currentLevel, float dt) {
 
   if (Vector2Length(moveInput) > 0) {
     moveInput = Vector2Normalize(moveInput);
-    Vector2 nextPos = Vector2Add(
-        player->position, Vector2Scale(moveInput, player->identity.speed * dt));
 
-    bool blocked = false;
+    Vector2 delta = Vector2Scale(moveInput, player->identity.speed * dt);
+    Vector2 newPos = player->position;
 
-    // Wall Collision
+    // --- X AXIS ---
+    Vector2 xPos = newPos;
+    xPos.x += delta.x;
+
+    bool blocked_x = false;
     for (int i = 0; i < currentLevel->wallCount; i++) {
-      if (CheckCollisionCircleRec(nextPos, player->radius,
-                                  currentLevel->walls[i])) {
-        blocked = true;
+      if (CheckCollisionCircleRec(xPos, player->radius,
+                    currentLevel->walls[i])) {
+        blocked_x = true;
         break;
       }
     }
 
-    // Door Collision (Physical Lock)
-    for (int i = 0; i < currentLevel->doorCount; i++) {
-      if (CheckCollisionCircleRec(nextPos, player->radius,
-                                  currentLevel->doors[i])) {
-        if (player->identity.permissionLevel >= currentLevel->doorPerms[i]) {
-          // ALLOW PASS
-        } else {
-          blocked = true;
+    for (int i = 0; i < currentLevel->doorCount && !blocked_x; i++) {
+      if (CheckCollisionCircleRec(xPos, player->radius, currentLevel->doors[i])) {
+        if (player->identity.permissionLevel < currentLevel->doorPerms[i]) {
+          blocked_x = true;
         }
       }
     }
 
-    if (!blocked) {
-      player->position = nextPos;
+    if (!blocked_x) {
+      newPos.x = xPos.x;
     }
+
+    // --- Y AXIS ---
+    Vector2 yPos = newPos;
+    yPos.y += delta.y;
+
+    bool blocked_y = false;
+    for (int i = 0; i < currentLevel->wallCount; i++) {
+      if (CheckCollisionCircleRec(yPos, player->radius, currentLevel->walls[i])) {
+        blocked_y = true;
+        break;
+      }
+    }
+
+    for (int i = 0; i < currentLevel->doorCount && !blocked_y; i++) {
+      if (CheckCollisionCircleRec(yPos, player->radius, currentLevel->doors[i])) {
+        if (player->identity.permissionLevel < currentLevel->doorPerms[i]) {
+          blocked_y = true;
+        }
+      }
+    }
+
+    if (!blocked_y) {
+      newPos.y = yPos.y;
+    }
+
+    player->position = newPos;
     player->velocity = Vector2Scale(moveInput, player->identity.speed);
   }
 }
