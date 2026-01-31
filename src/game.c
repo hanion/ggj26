@@ -28,8 +28,57 @@ static Camera2D camera;
 
 static Bullet bullets[MAX_BULLETS];
 static Entity droppedMask;
+static Bullet bullets[MAX_BULLETS];
+static Entity droppedMask;
 static bool maskActive;
 
+
+static Texture2D texZone1;
+static Texture2D texZone2;
+static Texture2D texZone3;
+static Texture2D texZone4;
+static Texture2D texZone5;
+static Texture2D texZone6;
+static Texture2D texZone7;
+
+// Helper function to simulate DrawTextureTiled
+void DrawTextureTiled(Texture2D texture, Rectangle source, Rectangle dest, Vector2 origin, float rotation, float scale, Color tint) {
+    if ((texture.id <= 0) || (scale <= 0.0f)) return;  // Wav, what about 0 scale? w/e
+    
+    // Grid size
+    int tileWidth = (int)((float)source.width * scale);
+    int tileHeight = (int)((float)source.height * scale);
+    
+    if ((dest.width < tileWidth) && (dest.height < tileHeight)) {
+        // Can fit one tile partially
+        DrawTexturePro(texture, (Rectangle){source.x, source.y, ((float)dest.width/tileWidth)*source.width, ((float)dest.height/tileHeight)*source.height},
+            (Rectangle){dest.x + origin.x, dest.y + origin.y, dest.width, dest.height}, origin, rotation, tint);
+    } else {
+        int dx = 0;
+        int dy = 0;
+        
+        while (dy < (int)dest.height) {
+            dx = 0;
+            while (dx < (int)dest.width) {
+                 // Calculate Draw Area
+                 float drawW = (float)tileWidth;
+                 float drawH = (float)tileHeight;
+                 
+                 if (dx + tileWidth > dest.width) drawW = (float)(dest.width - dx);
+                 if (dy + tileHeight > dest.height) drawH = (float)(dest.height - dy);
+                 
+                 // Draw part of texture
+                 DrawTexturePro(texture, 
+                     (Rectangle){source.x, source.y, (drawW/tileWidth)*source.width, (drawH/tileHeight)*source.height},
+                     (Rectangle){dest.x + dx + origin.x, dest.y + dy + origin.y, drawW, drawH},
+                     (Vector2){0, 0}, rotation, tint);
+
+                 dx += tileWidth;
+            }
+            dy += tileHeight;
+        }
+    }
+}
 void Game_Init(void) {
     gameOver = false;
     gameWon = false;
@@ -50,6 +99,18 @@ void Game_Init(void) {
     camera.offset = (Vector2){ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f };
     camera.rotation = 0.0f;
     camera.zoom = 1.0f;
+    camera.rotation = 0.0f;
+    camera.zoom = 1.0f;
+
+    // Load Textures (make sure to move these to assets/environment/...)
+    // Load Textures
+    texZone1 = LoadTexture("assets/environment/background_1.png");
+    texZone2 = LoadTexture("assets/environment/background_2.png");
+    texZone3 = LoadTexture("assets/environment/background_3.png");
+    texZone4 = LoadTexture("assets/environment/background_4.png");
+    texZone5 = LoadTexture("assets/environment/background_5.png");
+    texZone6 = LoadTexture("assets/environment/background_6.png");
+    texZone7 = LoadTexture("assets/environment/background_7.png");
 }
 
 void Game_Update(void) {
@@ -96,7 +157,9 @@ void Game_Update(void) {
 
     // Enemy Update
     for (int i = 0; i < currentLevel.enemyCount; i++) {
-        UpdateEnemy(&currentLevel.enemies[i], player.position, bullets, MAX_BULLETS, dt);
+    for (int i = 0; i < currentLevel.enemyCount; i++) {
+        UpdateEnemy(&currentLevel.enemies[i], player.position, bullets, MAX_BULLETS, dt, &currentLevel);
+    }
     }
 
     // Bullet Updates & Collisions
@@ -166,7 +229,9 @@ void Game_Update(void) {
     }
 
     // Win Condition
-    if (player.position.x > currentLevel.winX) {
+    // Snake Layout ends at Z7 (bottom-left area, y=1507..2312)
+    // Reach exit at bottom (y > 2200)
+    if (player.position.y > 2200.0f) {
         gameWon = true;
     }
 }
@@ -188,6 +253,55 @@ void Game_Draw(void) {
         }
     } else {
         BeginMode2D(camera);
+
+        // Draw Tiled Backgrounds for each Zone
+        // DrawTextureTiled(texture, source, dest, origin, rotation, scale, tint)
+        
+        // Zone 1: Staff (0 to 1000)
+        // Draw Scaled Backgrounds for each Zone (Exact Sizes)
+        // DrawTexturePro(texture, source, dest, origin, rotation, tint)
+        
+        // Zone 1: (0, 0) -> 913x642
+        DrawTexturePro(texZone1, 
+            (Rectangle){0, 0, (float)texZone1.width, (float)texZone1.height}, 
+            (Rectangle){0, 0, 913, 642}, 
+            (Vector2){0, 0}, 0.0f, WHITE);
+
+        // Zone 2: (913, 0) -> 911x661
+        DrawTexturePro(texZone2, 
+            (Rectangle){0, 0, (float)texZone2.width, (float)texZone2.height}, 
+            (Rectangle){913, 0, 911, 661}, 
+            (Vector2){0, 0}, 0.0f, WHITE);
+
+        // Zone 3: (1824, 0) -> 957x654 (913+911=1824)
+        DrawTexturePro(texZone3, 
+            (Rectangle){0, 0, (float)texZone3.width, (float)texZone3.height}, 
+            (Rectangle){1824, 0, 957, 654}, 
+            (Vector2){0, 0}, 0.0f, WHITE);
+
+        // Zone 4: (1824, 654) -> 869x645 (Below Z3 Left)
+        DrawTexturePro(texZone4, 
+            (Rectangle){0, 0, (float)texZone4.width, (float)texZone4.height}, 
+            (Rectangle){1824, 654, 869, 645}, 
+            (Vector2){0, 0}, 0.0f, WHITE);
+
+        // Zone 5: (957, 654) -> 867x649 (Left of Z4: 1824-867=957)
+        DrawTexturePro(texZone5, 
+            (Rectangle){0, 0, (float)texZone5.width, (float)texZone5.height}, 
+            (Rectangle){957, 654, 867, 649}, 
+            (Vector2){0, 0}, 0.0f, WHITE);
+
+        // Zone 6: (162, 654) -> 795x853 (Left of Z5: 957-795=162)
+        DrawTexturePro(texZone6, 
+            (Rectangle){0, 0, (float)texZone6.width, (float)texZone6.height}, 
+            (Rectangle){162, 654, 795, 853}, 
+            (Vector2){0, 0}, 0.0f, WHITE);
+
+        // Zone 7: (162, 1507) -> 795x805 (Below Z6: 654+853=1507)
+        DrawTexturePro(texZone7, 
+            (Rectangle){0, 0, (float)texZone7.width, (float)texZone7.height}, 
+            (Rectangle){162, 1507, 795, 805}, 
+            (Vector2){0, 0}, 0.0f, WHITE);
         // Draw Level Elements
         for (int i = 0; i < currentLevel.wallCount; i++)
             DrawRectangleRec(currentLevel.walls[i], GRAY);
@@ -195,8 +309,15 @@ void Game_Draw(void) {
             Color dColor = currentLevel.doorsOpen[i] ? GREEN : DARKGRAY;
             if (!currentLevel.doorsOpen[i]) {
                 DrawRectangleRec(currentLevel.doors[i], dColor);
-                DrawText(TextFormat("REQ: LVL %d", currentLevel.doorPerms[i]),
-                         (int)currentLevel.doors[i].x - 10,
+                const char* permName = "UNKNOWN";
+                switch(currentLevel.doorPerms[i]) {
+                    case PERM_CIVILIAN: permName = "REQ: CIV"; break;
+                    case PERM_STAFF:    permName = "REQ: STAFF"; break;
+                    case PERM_GUARD:    permName = "REQ: GUARD"; break;
+                    case PERM_ADMIN:    permName = "REQ: ADMIN"; break;
+                }
+                DrawText(permName,
+                         (int)currentLevel.doors[i].x - 40,
                          (int)currentLevel.doors[i].y + 50, 10, WHITE);
             } else {
                 DrawRectangleLinesEx(currentLevel.doors[i], 3.0f, GREEN);
@@ -256,5 +377,11 @@ void Game_Draw(void) {
 }
 
 void Game_Shutdown(void) {
-    // Cleanup if needed
+    UnloadTexture(texZone1);
+    UnloadTexture(texZone2);
+    UnloadTexture(texZone3);
+    UnloadTexture(texZone4);
+    UnloadTexture(texZone5);
+    UnloadTexture(texZone6);
+    UnloadTexture(texZone7);
 }
