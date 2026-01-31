@@ -67,6 +67,19 @@ static DroppedGun droppedGuns[MAX_DROPPED_GUNS];
 static Sound fxShoot = {0};
 static Sound fxReload = {0};
 
+// --- BLOOD PARTICLES ---
+#define MAX_PARTICLES 200
+typedef struct {
+    Vector2 position;
+    Vector2 velocity;
+    float life; // 0.0 to 1.0
+    Color color;
+    bool active;
+    float size;
+} Particle;
+
+static Particle particles[MAX_PARTICLES];
+
 static GameContext gameCtx;
 
 // Forward Declarations
@@ -314,6 +327,33 @@ static PlayerEquipState MapGunToEquip(GunType type) {
     return PLAYER_EQUIP_BARE_HANDS; 
 }
 
+static void SpawnBlood(Vector2 pos, int count) {
+    for (int i = 0; i < count; i++) {
+        // Find empty slot
+        int slot = -1;
+        for (int p=0; p<MAX_PARTICLES; p++) {
+            if (!particles[p].active) {
+                slot = p;
+                break;
+            }
+        }
+        
+        if (slot != -1) {
+            particles[slot].active = true;
+            particles[slot].position = pos;
+            
+            // Random direction blood spray
+            float angle = (float)GetRandomValue(0, 360) * DEG2RAD;
+            float speed = (float)GetRandomValue(100, 300);
+            
+            particles[slot].velocity = (Vector2){ cosf(angle)*speed, sinf(angle)*speed };
+            particles[slot].life = 1.0f; // 1 second
+            particles[slot].size = (float)GetRandomValue(2, 5);
+            particles[slot].color = (Color){ 200, 0, 0, 255 }; // Deep Red
+        }
+    }
+}
+
 static void UpdateGame(float dt) {
 	camera.offset = (Vector2){ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f };
 	float scale_x = GetScreenWidth()  / 1920.0f;
@@ -329,6 +369,19 @@ static void UpdateGame(float dt) {
     // Developer Mode Toggle F
     if (IsKeyPressed(KEY_F)) {
         developerMode = !developerMode;
+    }
+    
+    // Update Particles
+    for(int i=0; i<MAX_PARTICLES; i++) {
+        if(particles[i].active) {
+            particles[i].position.x += particles[i].velocity.x * dt;
+            particles[i].position.y += particles[i].velocity.y * dt;
+            particles[i].life -= dt * 2.0f; // Fade out speed
+            
+            if(particles[i].life <= 0) {
+                particles[i].active = false;
+            }
+        }
     }
 
     // Game Over / Win Logic Inputs
@@ -662,9 +715,14 @@ static void UpdateGame(float dt) {
         } else {
             // Hit Player?
             if (CheckCollisionCircles(bullets[i].position, bullets[i].radius, player.position, player.radius)) {
-                // Game Over
+                // Game Over Logic
                 if (!developerMode) { // God mode check
-                    gameOver = true; 
+                    player.health -= 1.0f;
+                    SpawnBlood(player.position, 20); // SPLATTER!
+                    
+                    if (player.health <= 0.0f) {
+                        gameOver = true; 
+                    }
                     bullets[i].active = false;
                 }
             }
@@ -1113,6 +1171,13 @@ static void DrawGame(void) {
              DrawRing(center, radius - 2, radius + 2, 0, 360 * progress, 36, RED);
 
              DrawText("CHOKING...", (int)center.x - 30, (int)center.y - 80, 10, RED);
+        }
+        
+        // Draw Particles
+        for(int i=0; i<MAX_PARTICLES; i++) {
+            if(particles[i].active) {
+                DrawRectangleV(particles[i].position, (Vector2){particles[i].size, particles[i].size}, Fade(particles[i].color, particles[i].life));
+            }
         }
         
         // Debug

@@ -13,8 +13,8 @@ Entity InitPlayer(Vector2 spawnPos, Identity startIdentity) {
   player.shootTimer = 0.0f;
   
   // STATS
-  player.health = 100.0f;
-  player.maxHealth = 100.0f;
+  player.health = 3.0f;
+  player.maxHealth = 3.0f;
   player.speedMultiplier = 1.0f;
   player.isInvisible = false;
   
