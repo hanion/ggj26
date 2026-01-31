@@ -128,6 +128,8 @@ void AnimPlayer_SetClip(AnimPlayer *player, AnimClip *clip) {
     player->clip = clip;
     player->time = 0.0f;
     player->frame_index = 0;
+    // Default behavior: loop animations unless caller disables it.
+    player->loop = true;
 }
 
 void AnimPlayer_Update(AnimPlayer *player, float dt) {
@@ -136,7 +138,18 @@ void AnimPlayer_Update(AnimPlayer *player, float dt) {
     float frameTime = 1.0f / player->clip->fps;
     while (player->time >= frameTime) {
         player->time -= frameTime;
-        player->frame_index = (player->frame_index + 1) % player->clip->frame_count;
+        if (player->loop) {
+            player->frame_index = (player->frame_index + 1) % player->clip->frame_count;
+        } else {
+            if (player->frame_index < player->clip->frame_count - 1) {
+                player->frame_index++;
+            } else {
+                // Clamp on last frame.
+                player->frame_index = player->clip->frame_count - 1;
+                player->time = 0.0f;
+                break;
+            }
+        }
     }
 }
 
@@ -145,4 +158,10 @@ Texture2D AnimPlayer_GetFrame(const AnimPlayer *player) {
         return (Texture2D){0};
     }
     return player->clip->frames[player->frame_index];
+}
+
+bool AnimPlayer_IsFinished(const AnimPlayer *player) {
+    if (!player || !player->clip || player->clip->frame_count == 0) return true;
+    if (player->loop) return false;
+    return player->frame_index >= (player->clip->frame_count - 1);
 }

@@ -37,6 +37,7 @@ typedef enum {
 } PlayerAnimState;
 
 typedef enum {
+    PLAYER_GUN_EQUIP,
     PLAYER_GUN_IDLE,
     PLAYER_GUN_WALK,
     PLAYER_GUN_SHOOT
@@ -54,7 +55,7 @@ static bool playerAnimLoaded;
 static bool playerGunAnimLoaded;
 static PlayerAnimState playerAnimState;
 static PlayerGunAnimState playerGunAnimState;
-static const float playerSpriteScale = 0.2f;
+static const float playerSpriteScale = 0.3f;
 static const Vector2 playerSpritePivot = {0.5f, 0.5f};
 static const float playerGunShootHold = 0.2f;
 static float playerGunShootTimer = 0.0f;
@@ -65,9 +66,12 @@ static const float droppedMaskRadius = 15.0f;
 static const float playerDebugCrossSize = 6.0f;
 static const bool playerDebugDraw = false;
 static int meleeTargetIndex = -1;
-static Vector2 playerFramePivot = {0.5f, 0.5f};
+static Vector2 playerFramePivot = {0.1f, 0.1f};
 static bool playerFramePivotReady = false;
 static const unsigned char playerPivotAlphaThreshold = 32;
+
+// Track equipment transitions to play one-shot equip animation.
+static PlayerEquipState lastEquipmentState;
 
 static void DrawPlayerFallback(Vector2 position, float radius) {
     float size = radius * 2.0f;
@@ -75,25 +79,34 @@ static void DrawPlayerFallback(Vector2 position, float radius) {
                    (Vector2){size, size}, RED);
 }
 
+
 static void DrawPlayerFrame(Texture2D frame, Vector2 position, float rotation) {
-    Rectangle source = {0.0f, 0.0f, (float)frame.width, (float)frame.height};
-    Vector2 pivot = playerFramePivotReady ? playerFramePivot : playerSpritePivot;
-    Vector2 origin = {frame.width * playerSpriteScale * pivot.x,
-                      frame.height * playerSpriteScale * pivot.y};
-    Rectangle dest = {position.x - origin.x, position.y - origin.y,
-                      frame.width * playerSpriteScale,
-                      frame.height * playerSpriteScale};
+    Rectangle source = (Rectangle){0.0f, 0.0f, (float)frame.width, (float)frame.height};
+
+    float destW = frame.width * playerSpriteScale;
+    float destH = frame.height * playerSpriteScale;
+
+    // Destination rectangle is centered at position
+    Rectangle dest = (Rectangle){ position.x, position.y, destW, destH };
+
+    // Origin is the pivot within the destination rect (half-size for centering)
+    Vector2 origin = (Vector2){ destW * playerSpritePivot.x, destH * playerSpritePivot.y };
+
     DrawTexturePro(frame, source, dest, origin, rotation, WHITE);
 }
 
 static void DrawPlayerShadow(Texture2D shadow, Vector2 position) {
-    Rectangle source = {0.0f, 0.0f, (float)shadow.width, (float)shadow.height};
-    Vector2 pivot = playerFramePivotReady ? playerFramePivot : playerSpritePivot;
-    Vector2 origin = {shadow.width * playerSpriteScale * pivot.x,
-                      shadow.height * playerSpriteScale * pivot.y};
-    Rectangle dest = {position.x - origin.x, position.y - origin.y,
-                      shadow.width * playerSpriteScale,
-                      shadow.height * playerSpriteScale};
+    Rectangle source = (Rectangle){0.0f, 0.0f, (float)shadow.width, (float)shadow.height};
+
+    float destW = shadow.width * playerSpriteScale;
+    float destH = shadow.height * playerSpriteScale;
+
+    // Destination rectangle is centered at position (optionally offset slightly down if desired)
+    Rectangle dest = (Rectangle){ position.x, position.y, destW, destH };
+
+    // Origin centered; no rotation for shadow
+    Vector2 origin = (Vector2){ destW * playerSpritePivot.x, destH * playerSpritePivot.y };
+
     DrawTexturePro(shadow, source, dest, origin, 0.0f, WHITE);
 }
 
@@ -193,6 +206,7 @@ void Game_Init(void) {
     player.equipmentState = PLAYER_EQUIP_BARE_HANDS;
     player.rotation = 0.0f;
     playerGunShootTimer = 0.0f;
+    lastEquipmentState = player.equipmentState;
 
     // Camera
     camera = (Camera2D){0};
@@ -260,6 +274,17 @@ void Game_Update(void) {
 
     // Player Update
     UpdatePlayer(&player, &currentLevel, dt);
+
+    // Detect equipment changes (used to kick off one-shot equip animation).
+    if (player.equipmentState != lastEquipmentState) {
+        if (player.equipmentState == PLAYER_EQUIP_GUN && playerGunAnimLoaded) {
+            playerGunShootTimer = 0.0f;
+            playerGunAnimState = PLAYER_GUN_EQUIP;
+            AnimPlayer_SetClip(&playerGunAnim, &playerGunIdleClip); // takeAimGun40
+            playerGunAnim.loop = false; // play once and hold last frame
+        }
+        lastEquipmentState = player.equipmentState;
+    }
     PlayerAnimState nextState =
         Vector2Length(player.velocity) > 0.01f ? PLAYER_ANIM_WALK : PLAYER_ANIM_IDLE;
     if (nextState != playerAnimState) {
@@ -277,7 +302,17 @@ void Game_Update(void) {
     Vector2 aimDir = Vector2Subtract(mouseWorld, player.position);
     Vector2 aimDirNormalized =
         Vector2Length(aimDir) > 0.01f ? Vector2Normalize(aimDir) : (Vector2){1.0f, 0.0f};
-    player.rotation = atan2f(aimDirNormalized.y, aimDirNormalized.x) * RAD2DEG;
+
+    // 0 degrees from atan2 is pointing RIGHT (+X).
+    // Set this offset to match how the sprite is authored.
+    // If your sprite faces UP by default, start with -90
+    const float spriteFacingOffsetDeg = +90.0f;
+
+    // If rotation is mirrored (turns the wrong way), flip sign:
+    // float aimDeg = -atan2f(aimDirNormalized.y, aimDirNormalized.x) * RAD2DEG;
+    float aimDeg = atan2f(aimDirNormalized.y, aimDirNormalized.x) * RAD2DEG;
+
+    player.rotation = aimDeg + spriteFacingOffsetDeg;
     if (playerGunShootTimer > 0.0f) {
         playerGunShootTimer -= dt;
         if (playerGunShootTimer < 0.0f) {
@@ -286,20 +321,31 @@ void Game_Update(void) {
     }
 
     if (player.equipmentState == PLAYER_EQUIP_GUN && playerGunAnimLoaded) {
-        PlayerGunAnimState gunNextState = PLAYER_GUN_IDLE;
-        if (playerGunShootTimer > 0.0f) {
-            gunNextState = PLAYER_GUN_SHOOT;
-        } else if (Vector2Length(player.velocity) > 0.01f) {
-            gunNextState = PLAYER_GUN_WALK;
+        // If we're in the one-shot equip anim, let it finish before entering idle/walk.
+        if (playerGunAnimState == PLAYER_GUN_EQUIP) {
+            AnimPlayer_Update(&playerGunAnim, dt);
+            if (AnimPlayer_IsFinished(&playerGunAnim)) {
+                playerGunAnimState = PLAYER_GUN_IDLE;
+                AnimPlayer_SetClip(&playerGunAnim, &playerGunIdleClip);
+                playerGunAnim.loop = true;
+            }
+        } else {
+            PlayerGunAnimState gunNextState = PLAYER_GUN_IDLE;
+            if (playerGunShootTimer > 0.0f) {
+                gunNextState = PLAYER_GUN_SHOOT;
+            } else if (Vector2Length(player.velocity) > 0.01f) {
+                gunNextState = PLAYER_GUN_WALK;
+            }
+            if (gunNextState != playerGunAnimState) {
+                playerGunAnimState = gunNextState;
+                AnimPlayer_SetClip(&playerGunAnim,
+                                   playerGunAnimState == PLAYER_GUN_SHOOT ? &playerGunShootClip :
+                                   playerGunAnimState == PLAYER_GUN_WALK ? &playerGunWalkClip :
+                                                                           &playerGunIdleClip);
+                playerGunAnim.loop = true;
+            }
+            AnimPlayer_Update(&playerGunAnim, dt);
         }
-        if (gunNextState != playerGunAnimState) {
-            playerGunAnimState = gunNextState;
-            AnimPlayer_SetClip(&playerGunAnim,
-                               playerGunAnimState == PLAYER_GUN_SHOOT ? &playerGunShootClip :
-                               playerGunAnimState == PLAYER_GUN_WALK ? &playerGunWalkClip :
-                                                                       &playerGunIdleClip);
-        }
-        AnimPlayer_Update(&playerGunAnim, dt);
     }
 
     // Player Shooting
