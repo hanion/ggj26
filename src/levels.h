@@ -4,10 +4,17 @@
 #include "../raylib/src/raylib.h"
 #include "entity.h"
 #include "types.h"
+#include <stddef.h>
 
 #define MAX_WALLS 200
 #define MAX_DOORS 20
 #define MAX_ENEMIES 50
+
+typedef struct {
+	Texture2D texture;
+	Rectangle source;
+	Rectangle dest;
+} Background;
 
 typedef struct {
   int id; // Phase/Episode ID
@@ -32,9 +39,14 @@ typedef struct {
 
   // Win Condition (Reach X)
   float winX;
+
+  Background bgs[MAX_DOORS];
+  size_t bgs_count;
+
 } Level;
 
 // Function prototype for level loader
 void InitLevel(int episode, Level *level);
+void UnloadLevel(int episode);
 
 #endif // LEVELS_H

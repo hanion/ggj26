@@ -25,6 +25,8 @@
 #include "ui/hud.h"
 #include "types.h"
 
+#include "editor.c"
+
 // Game Constants
 #define MAX_BULLETS 100
 #define BULLET_SPEED 800.0f
@@ -46,6 +48,7 @@ typedef enum {
 
 static GameState currentState;
 static Level currentLevel;
+LevelEditor editor;
 static bool gameOver; 
 static bool gameWon; 
 
@@ -75,13 +78,6 @@ static void UpdateGame(float dt);
 static PlayerEquipState MapGunToEquip(GunType type);
 
 
-static Texture2D texZone1;
-static Texture2D texZone2;
-static Texture2D texZone3;
-static Texture2D texZone4;
-static Texture2D texZone5;
-static Texture2D texZone6;
-static Texture2D texZone7;
 
 // --- RENDER & GAMEPLAY STATES ---
 static PlayerRender playerRender;
@@ -151,7 +147,13 @@ void DrawTextureTiled(Texture2D texture, Rectangle source, Rectangle dest, Vecto
 // --- FOG OF WAR STATE ---
 static bool visitedZones[7];
 
+void EndLevel(int id);
+
 void StartLevel(int id) {
+	if (id) {
+		EndLevel(id);
+	}
+	editor = LevelEditor_new(&currentLevel);
     gameOver = false;
     gameWon = false;
     gameCtx.hasWonLastEpisode = false;
@@ -212,20 +214,15 @@ void StartLevel(int id) {
     camera.rotation = 0.0f;
     camera.zoom = 1.0f;
 
-    // Load Textures
-    if (texZone1.id == 0)texZone1 = LoadTexture("assets/environment/background_1.png");
-    if (texZone2.id == 0)texZone2 = LoadTexture("assets/environment/background_2.png");
-    if (texZone3.id == 0)texZone3 = LoadTexture("assets/environment/background_3.png");
-    if (texZone4.id == 0)texZone4 = LoadTexture("assets/environment/background_4.png");
-    if (texZone5.id == 0)texZone5 = LoadTexture("assets/environment/background_5.png");
-    if (texZone6.id == 0)texZone6 = LoadTexture("assets/environment/background_6.png");
-    if (texZone7.id == 0)texZone7 = LoadTexture("assets/environment/background_7.png");
-
     // Init Player Render
     PlayerRender_Init(&playerRender);
     PlayerRender_LoadEpisodeAssets(&playerRender);
     PlayerRender_OnEquip(&playerRender, lastEquipmentState);
 }
+
+void EndLevel(int id) {
+}
+
 
 void Game_Init(void) {
     currentState = STATE_MENU;
@@ -802,20 +799,10 @@ static void DrawGame(void) {
     } else {
         BeginMode2D(camera);
 
-        // Zone 1
-        DrawTexturePro(texZone1, (Rectangle){0,0,texZone1.width,texZone1.height}, (Rectangle){0,0,913,642}, (Vector2){0,0}, 0.f, WHITE);
-        // Zone 2
-        DrawTexturePro(texZone2, (Rectangle){0,0,texZone2.width,texZone2.height}, (Rectangle){913,0,911,661}, (Vector2){0,0}, 0.f, WHITE);
-        // Zone 3
-        DrawTexturePro(texZone3, (Rectangle){0,0,texZone3.width,texZone3.height}, (Rectangle){1824,0,957,654}, (Vector2){0,0}, 0.f, WHITE);
-        // Zone 4
-        DrawTexturePro(texZone4, (Rectangle){0,0,texZone4.width,texZone4.height}, (Rectangle){1824,654,869,645}, (Vector2){0,0}, 0.f, WHITE);
-        // Zone 5
-        DrawTexturePro(texZone5, (Rectangle){0,0,texZone5.width,texZone5.height}, (Rectangle){957,654,867,649}, (Vector2){0,0}, 0.f, WHITE);
-        // Zone 6
-        DrawTexturePro(texZone6, (Rectangle){0,0,texZone6.width,texZone6.height}, (Rectangle){162,654,795,853}, (Vector2){0,0}, 0.f, WHITE);
-        // Zone 7
-        DrawTexturePro(texZone7, (Rectangle){0,0,texZone7.width,texZone7.height}, (Rectangle){162,1507,795,805}, (Vector2){0,0}, 0.f, WHITE);
+        for (int i = 0; i < currentLevel.bgs_count; i++) {
+            Background* bg = &currentLevel.bgs[i];
+            DrawTexturePro(bg->texture, bg->source, bg->dest, (Vector2){0,0}, 0.f, WHITE);
+        }
 
         // Draw Level Elements
         if (playerDebugDraw) {
@@ -981,6 +968,8 @@ static void DrawGame(void) {
         DrawText("DEV MODE ON (F) - GOD & UNLOCK", 10, 10, 20, GREEN);
     }
     }
+
+	level_editor_draw(&editor, camera);
     EndDrawing();
 }
 
@@ -1004,12 +993,5 @@ void Game_Draw(void) {
 
 
 void Game_Shutdown(void) {
-    UnloadTexture(texZone1);
-    UnloadTexture(texZone2);
-    UnloadTexture(texZone3);
-    UnloadTexture(texZone4);
-    UnloadTexture(texZone5);
-    UnloadTexture(texZone6);
-    UnloadTexture(texZone7);
 }
 

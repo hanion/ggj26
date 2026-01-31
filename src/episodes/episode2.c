@@ -103,3 +103,7 @@ void InitEpisode2(Level *level) {
     level->enemies[level->enemyCount++] = InitEnemy((Vector2){5500, 600}, ENEMY_ADMIN);
     level->enemies[level->enemyCount++] = InitEnemy((Vector2){6000, 360}, ENEMY_ADMIN); // Final boss
 }
+
+void UnloadEpisode2() {
+
+}
