@@ -20,6 +20,11 @@
 #define BULLET_RADIUS 5.0f
 #define BULLET_LIFETIME 2.0f
 
+// Ammo constants
+#define MAG_SIZE 12
+#define RESERVE_AMMO_START 48
+#define RELOAD_DURATION 1.5f  // Duration of reload animation in seconds
+
 // --- GAME STATE ---
 typedef enum {
     STATE_MENU,
@@ -167,6 +172,10 @@ static void StartLevel(int episodeId) {
     player = InitPlayer(currentLevel.playerSpawn, currentLevel.playerStartId);
     player.equipmentState = PLAYER_EQUIP_KNIFE;
     player.rotation = 0.0f;
+    player.magAmmo = MAG_SIZE;
+    player.reserveAmmo = RESERVE_AMMO_START;
+    player.isReloading = false;
+    player.reloadTimer = 0.0f;
     weaponShootTimer = 0.0f;
     lastEquipmentState = player.equipmentState;
 
@@ -312,24 +321,63 @@ static void UpdateGame(float dt) {
 
     // Update all player visual animation state in one place.
     PlayerRender_Update(&playerRender, &player, dt, weaponShootTimer);
+    
+    // Handle reload timer
+    if (player.isReloading) {
+        player.reloadTimer -= dt;
+        if (player.reloadTimer <= 0.0f) {
+            // Reload complete - transfer ammo
+            int ammoNeeded = MAG_SIZE - player.magAmmo;
+            int ammoToTransfer = ammoNeeded < player.reserveAmmo ? ammoNeeded : player.reserveAmmo;
+            player.magAmmo += ammoToTransfer;
+            player.reserveAmmo -= ammoToTransfer;
+            player.isReloading = false;
+            player.reloadTimer = 0.0f;
+        }
+    }
+
+    // Reload input (R key)
+    if (IsKeyPressed(KEY_R) && !player.isReloading) {
+        bool canReload = (player.equipmentState == PLAYER_EQUIP_HANDGUN ||
+                         player.equipmentState == PLAYER_EQUIP_RIFLE ||
+                         player.equipmentState == PLAYER_EQUIP_SHOTGUN) &&
+                        player.magAmmo < MAG_SIZE && player.reserveAmmo > 0;
+        if (canReload) {
+            player.isReloading = true;
+            player.reloadTimer = RELOAD_DURATION;
+        }
+    }
 
     // Player Shooting
-    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+    bool shootPressed = IsMouseButtonPressed(MOUSE_LEFT_BUTTON) || IsKeyPressed(KEY_SPACE);
+    if (shootPressed) {
         bool canShoot = (player.equipmentState == PLAYER_EQUIP_HANDGUN ||
                         player.equipmentState == PLAYER_EQUIP_RIFLE ||
                         player.equipmentState == PLAYER_EQUIP_SHOTGUN) &&
-                       HasAbility(player.identity, ABILITY_SHOOT);
+                       HasAbility(player.identity, ABILITY_SHOOT) &&
+                       !player.isReloading;
+        
         if (canShoot) {
-            for (int i = 0; i < MAX_BULLETS; i++) {
-                if (!bullets[i].active) {
-                    bullets[i].active = true;
-                    bullets[i].position = player.position;
-                    bullets[i].radius = BULLET_RADIUS;
-                    bullets[i].lifeTime = BULLET_LIFETIME;
-                    bullets[i].isPlayerOwned = true;
-                    bullets[i].velocity = Vector2Scale(aimDirNormalized, BULLET_SPEED);
-                    weaponShootTimer = weaponShootHold;
-                    break;
+            if (player.magAmmo > 0) {
+                // Shoot
+                for (int i = 0; i < MAX_BULLETS; i++) {
+                    if (!bullets[i].active) {
+                        bullets[i].active = true;
+                        bullets[i].position = player.position;
+                        bullets[i].radius = BULLET_RADIUS;
+                        bullets[i].lifeTime = BULLET_LIFETIME;
+                        bullets[i].isPlayerOwned = true;
+                        bullets[i].velocity = Vector2Scale(aimDirNormalized, BULLET_SPEED);
+                        weaponShootTimer = weaponShootHold;
+                        player.magAmmo--;
+                        break;
+                    }
+                }
+            } else {
+                // Auto-reload when trying to shoot with empty mag
+                if (player.reserveAmmo > 0) {
+                    player.isReloading = true;
+                    player.reloadTimer = RELOAD_DURATION;
                 }
             }
         }
@@ -487,6 +535,7 @@ static void DrawGame(void) {
 
         if (playerRender.loaded) {
             PlayerRender_Draw(&playerRender, &player);
+            PlayerRender_DrawMuzzleFlash(&playerRender, &player, weaponShootTimer);
         } else {
             DrawPlayerFallback(player.position, player.radius);
         }
@@ -522,6 +571,17 @@ static void DrawGame(void) {
             default: break;
         }
         DrawText(equipText, 20, 45, 16, WHITE);
+        
+        // Display ammo for guns
+        if (player.equipmentState == PLAYER_EQUIP_HANDGUN ||
+            player.equipmentState == PLAYER_EQUIP_RIFLE ||
+            player.equipmentState == PLAYER_EQUIP_SHOTGUN) {
+            const char *ammoText = TextFormat("AMMO: %d / %d", player.magAmmo, player.reserveAmmo);
+            DrawText(ammoText, 20, 65, 16, WHITE);
+            if (player.isReloading) {
+                DrawText("RELOADING...", 20, 85, 16, YELLOW);
+            }
+        }
     }
 
     EndDrawing();
