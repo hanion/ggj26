@@ -27,6 +27,9 @@
 #define MUZZLE_OFFSET_X 40.0f
 #define MUZZLE_OFFSET_Y -10.0f
 
+// Rotation offset to match sprite orientation (sprite faces up by default, so offset by -90 degrees)
+#define SPRITE_ROTATION_OFFSET -90.0f
+
 // --- GAME STATE ---
 typedef enum {
     STATE_MENU,
@@ -280,6 +283,7 @@ static void StartLevel(int episodeId) {
     playerGunIdleClip = LoadAnimClip("assets/character/LightArtilleryRobot/idle60", 30.0f);
     playerGunWalkClip = LoadAnimClip("assets/character/LightArtilleryRobot/walk60", 60.0f);
     playerGunShootClip = LoadAnimClip("assets/character/LightArtilleryRobot/shootGun20", 60.0f);
+    // TODO: Replace with dedicated reload animation when assets are available
     playerGunReloadClip = LoadAnimClip("assets/character/LightArtilleryRobot/idle60", 30.0f);
     playerShadow = LoadTexture("assets/character/LightArtilleryRobot/shadow.png");
     muzzleFlashTexture = LoadTexture("assets/effects/muzzle_flash_01.tga");
@@ -712,14 +716,16 @@ static void DrawGame(void) {
             // Draw muzzle flash if active
             if (muzzleFlashTimer > 0.0f && muzzleFlashLoaded) {
                 // Calculate muzzle flash position with offset based on aim direction
-                float aimRadians = (player.rotation - 90.0f) * DEG2RAD;
+                // Convert player rotation to aim direction (compensate for sprite orientation)
+                float aimRadians = (player.rotation + SPRITE_ROTATION_OFFSET) * DEG2RAD;
                 float facingX = cosf(aimRadians);
                 float facingY = sinf(aimRadians);
                 
-                // Apply offset in the direction the gun is facing
+                // Apply 2D rotation to offset vector: rotate (MUZZLE_OFFSET_X, MUZZLE_OFFSET_Y) by aim angle
+                // This ensures muzzle flash appears at gun barrel regardless of facing direction
                 Vector2 flashPos = {
-                    player.position.x + facingX * MUZZLE_OFFSET_X + facingY * MUZZLE_OFFSET_Y,
-                    player.position.y + facingY * MUZZLE_OFFSET_X - facingX * MUZZLE_OFFSET_Y
+                    player.position.x + facingX * MUZZLE_OFFSET_X - facingY * MUZZLE_OFFSET_Y,
+                    player.position.y + facingY * MUZZLE_OFFSET_X + facingX * MUZZLE_OFFSET_Y
                 };
                 
                 float flashScale = 0.5f;
@@ -735,7 +741,7 @@ static void DrawGame(void) {
                     (muzzleFlashTexture.height * flashScale) / 2.0f
                 };
                 
-                DrawTexturePro(muzzleFlashTexture, source, dest, origin, player.rotation - 90.0f, WHITE);
+                DrawTexturePro(muzzleFlashTexture, source, dest, origin, player.rotation + SPRITE_ROTATION_OFFSET, WHITE);
             }
         } else {
             DrawPlayerFallback(player.position, player.radius);
