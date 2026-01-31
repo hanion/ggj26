@@ -13,7 +13,9 @@ int main(void) {
   Game_Init();
 
   while (!WindowShouldClose()) {
-    Game_Update();
+    if (!Game_Update()) {
+      break;
+    }
     Game_Draw();
   }
 
