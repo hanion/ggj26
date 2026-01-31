@@ -23,19 +23,19 @@ else
     endif
 endif
 
-SRC = src/main.c                \
-        src/game.c               \
-    src/game_context.c       \
-        src/levels.c            \
-        src/episodes/episode1.c  \
-    src/player/player.c      \
+SRC = src/main.c \
+    src/game.c \
+    src/game_context.c \
+    src/levels.c \
+    src/episodes/episode1.c \
+    src/player/player.c \
     src/player/player_render.c \
     src/player/player_actions.c \
-    src/ui/hud.c             \
-        src/enemies/enemy1.c    \
-        src/anim.c               \
-        src/episodes/episode2.c  \
-        src/enemies/enemy_factory.c 
+    src/ui/hud.c \
+    src/enemies/enemy1.c \
+    src/anim.c \
+    src/episodes/episode2.c \
+    src/enemies/enemy_factory.c
 
 ggj26: $(SRC)
 	$(CC) -o ggj26 $(SRC) $(CFLAGS) $(LDFLAGS) $(LIBS)
