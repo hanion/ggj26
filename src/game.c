@@ -53,8 +53,8 @@ static Entity player;
 static Camera2D camera;
 
 static Bullet bullets[MAX_BULLETS];
-static Entity droppedMask;
-static bool maskActive;
+#define MAX_MASKS 20
+static Entity droppedMasks[MAX_MASKS];
 static float levelStartTimer = 0.0f;
 static const float LEVEL_START_DELAY = 1.0f;
 
@@ -141,7 +141,10 @@ void StartLevel(int id) {
     gameOver = false;
     gameWon = false;
     gameCtx.hasWonLastEpisode = false;
-    maskActive = false;
+    
+    // Reset masks
+    for(int i=0; i<MAX_MASKS; i++) droppedMasks[i].active = false;
+    
     currentState = STATE_PLAYING;
     levelStartTimer = LEVEL_START_DELAY;
 
@@ -461,8 +464,8 @@ static void UpdateGame(float dt) {
             PlayerActions_HandleEnemyKilled(&currentLevel,
                                             meleeTargetIndex,
                                             &player,
-                                            &droppedMask,
-                                            &maskActive,
+                                            droppedMasks,
+                                            MAX_MASKS,
                                             droppedMaskRadius);
             meleeTargetIndex = -1;
         }
@@ -504,8 +507,8 @@ static void UpdateGame(float dt) {
                     PlayerActions_HandleEnemyKilled(&currentLevel,
                                                     e,
                                                     &player,
-                                                    &droppedMask,
-                                                    &maskActive,
+                                                    droppedMasks,
+                                                    MAX_MASKS,
                                                     droppedMaskRadius);
                 }
             }
@@ -519,11 +522,13 @@ static void UpdateGame(float dt) {
     }
 
     // Mask Pickup
-    if (maskActive) {
-        if (CheckCollisionCircles(player.position, player.radius, droppedMask.position, droppedMask.radius)) {
-            if (IsKeyPressed(KEY_SPACE)) {
-                player.identity = droppedMask.identity;
-                maskActive = false;
+    for (int i = 0; i < MAX_MASKS; i++) {
+        if (droppedMasks[i].active) {
+            if (CheckCollisionCircles(player.position, player.radius, droppedMasks[i].position, droppedMasks[i].radius)) {
+                if (IsKeyPressed(KEY_SPACE)) {
+                    player.identity = droppedMasks[i].identity;
+                    droppedMasks[i].active = false;
+                }
             }
         }
     }
@@ -653,9 +658,11 @@ static void DrawGame(void) {
         }
 
         // Mask
-        if (maskActive) {
-            DrawCircleV(droppedMask.position, droppedMask.radius, droppedMask.identity.color);
-            DrawText("PRESS SPACE", (int)droppedMask.position.x - 30, (int)droppedMask.position.y - 30, 10, WHITE);
+        for (int i = 0; i < MAX_MASKS; i++) {
+            if (droppedMasks[i].active) {
+                DrawCircleV(droppedMasks[i].position, droppedMasks[i].radius, droppedMasks[i].identity.color);
+                DrawText("PRESS SPACE", (int)droppedMasks[i].position.x - 30, (int)droppedMasks[i].position.y - 30, 10, WHITE);
+            }
         }
 
         // Bullets

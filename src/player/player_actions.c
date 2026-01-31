@@ -23,10 +23,10 @@ int PlayerActions_GetClosestEnemyInRange(const Level *level, Vector2 position, f
 void PlayerActions_HandleEnemyKilled(Level *level,
                                     int enemyIndex,
                                     Entity *player,
-                                    Entity *droppedMask,
-                                    bool *maskWasActivated,
+                                    Entity *droppedMasks,
+                                    int maxMasks,
                                     float droppedMaskRadius) {
-    if (!level || !player || !droppedMask || !maskWasActivated) return;
+    if (!level || !player || !droppedMasks) return;
     if (enemyIndex < 0 || enemyIndex >= level->enemyCount) {
         return;
     }
@@ -36,11 +36,16 @@ void PlayerActions_HandleEnemyKilled(Level *level,
 
     level->enemies[enemyIndex].active = false;
 
-    *maskWasActivated = true;
-    droppedMask->identity = level->enemies[enemyIndex].identity;
-    droppedMask->position = level->enemies[enemyIndex].position;
-    droppedMask->radius = droppedMaskRadius;
-    droppedMask->active = true;
+    // Find first inactive mask slot
+    for (int i = 0; i < maxMasks; i++) {
+        if (!droppedMasks[i].active) {
+            droppedMasks[i].identity = level->enemies[enemyIndex].identity;
+            droppedMasks[i].position = level->enemies[enemyIndex].position;
+            droppedMasks[i].radius = droppedMaskRadius;
+            droppedMasks[i].active = true;
+            break;
+        }
+    }
 
     // Auto-equip handgun after a kill (so player can shoot instead of staying on knife).
     // If you later add actual weapon pickups, move this to that pickup logic instead.
