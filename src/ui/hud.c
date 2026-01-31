@@ -247,10 +247,29 @@ void Hud_DrawPlayer(const Entity *player) {
     
     bool hasGunEquipped = (currentGun->type != GUN_NONE && currentGun->type != GUN_KNIFE);
 
-    // Row 1: Level/Card icon + level text
-    DrawHudIconRow((Vector2){iconStartX, lineY0 + 0.0f},
-                   hudLevelTexture,
-                   TextFormat("ACCESS: %d", inv->card.level));
+    // Row 1: Hearts (Health)
+    // Draw 5 hearts
+    float heartX = iconStartX;
+    float heartY = lineY0;
+    
+    for (int i = 0; i < 3; i++) {
+        Color heartCol = (i < (int)player->health) ? RED : Fade(RED, 0.2f); // Lit or Dim
+        
+        // Procedural Heart using Circles and Triangle
+        // Center at heartX + i*30, heartY + 20
+        Vector2 center = { heartX + i * 35 + 15, heartY + 20 };
+        float size = 10.0f;
+        
+        DrawCircleV((Vector2){center.x - size/2, center.y - size/2}, size/1.5f, heartCol);
+        DrawCircleV((Vector2){center.x + size/2, center.y - size/2}, size/1.5f, heartCol);
+        DrawTriangle((Vector2){center.x - size, center.y - size/4}, 
+                     (Vector2){center.x, center.y + size}, 
+                     (Vector2){center.x + size, center.y - size/4}, heartCol);
+    }
+    
+    // Also show Level text somewhere else or below?
+    // Let's keep Access Level info:
+     DrawText(TextFormat("LVL: %d", inv->card.level), (int)heartX + 180, (int)heartY + 12, 20, SKYBLUE);
 
     // Row 2: Weapon icon + weapon text
     const char *weaponText = "HANDS";
