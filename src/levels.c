@@ -23,3 +23,10 @@ void InitLevel(int episode, Level *level) {
     break;
   }
 }
+
+void UnloadLevel(int episode) {
+  switch (episode) {
+  case 1: UnloadEpisode1(); break;
+  case 2: UnloadEpisode2(); break;
+  }
+}

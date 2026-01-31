@@ -2,6 +2,14 @@
 #include "../types.h"
 #include "episodes.h"
 
+static Texture2D texZone1;
+static Texture2D texZone2;
+static Texture2D texZone3;
+static Texture2D texZone4;
+static Texture2D texZone5;
+static Texture2D texZone6;
+static Texture2D texZone7;
+
 
 // Define constants locally if needed, or share via header.
 // For now, hardcoded values from main.c are fine or we can redefine macros.
@@ -198,4 +206,34 @@ void InitEpisode1(Level *level) {
   // Z7 (500, 1900) - Final Guard -> Guardian
   level->enemies[6] = (Entity){.position={500, 1900}, .active=true, .isPlayer=false, .radius=20, .identity=idKeyZ3, 
                               .shootTimer=ENEMY_SHOOT_INTERVAL, .aiType=AI_GUARDIAN, .sightRange=1600.0f, .sightAngle=120.0f, .rotation=(float)GetRandomValue(0,360)};
+
+
+
+    // Load Textures
+    if (texZone1.id == 0)texZone1 = LoadTexture("assets/environment/background_1.png");
+    if (texZone2.id == 0)texZone2 = LoadTexture("assets/environment/background_2.png");
+    if (texZone3.id == 0)texZone3 = LoadTexture("assets/environment/background_3.png");
+    if (texZone4.id == 0)texZone4 = LoadTexture("assets/environment/background_4.png");
+    if (texZone5.id == 0)texZone5 = LoadTexture("assets/environment/background_5.png");
+    if (texZone6.id == 0)texZone6 = LoadTexture("assets/environment/background_6.png");
+    if (texZone7.id == 0)texZone7 = LoadTexture("assets/environment/background_7.png");
+
+    level->bgs[0] = (Background){texZone1, (Rectangle){0,0,texZone1.width,texZone1.height}, (Rectangle){0,0,913,642}};
+    level->bgs[2] = (Background){texZone2, (Rectangle){0,0,texZone2.width,texZone2.height}, (Rectangle){913,0,911,661}};
+    level->bgs[3] = (Background){texZone3, (Rectangle){0,0,texZone3.width,texZone3.height}, (Rectangle){1824,0,957,654}};
+    level->bgs[4] = (Background){texZone4, (Rectangle){0,0,texZone4.width,texZone4.height}, (Rectangle){1824,654,869,645}};
+    level->bgs[5] = (Background){texZone5, (Rectangle){0,0,texZone5.width,texZone5.height}, (Rectangle){957,654,867,649}};
+    level->bgs[6] = (Background){texZone6, (Rectangle){0,0,texZone6.width,texZone6.height}, (Rectangle){162,654,795,853}};
+    level->bgs[7] = (Background){texZone7, (Rectangle){0,0,texZone7.width,texZone7.height}, (Rectangle){162,1507,795,805}};
+	level->bgs_count = 8;
+}
+
+void UnloadEpisode1() {
+    UnloadTexture(texZone1);
+    UnloadTexture(texZone2);
+    UnloadTexture(texZone3);
+    UnloadTexture(texZone4);
+    UnloadTexture(texZone5);
+    UnloadTexture(texZone6);
+    UnloadTexture(texZone7);
 }
