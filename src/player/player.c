@@ -45,14 +45,13 @@ void UpdatePlayer(Entity *player, Level *currentLevel, float dt, bool godMode) {
   Masks_Update(player, dt);
 
   Vector2 moveInput = {0};
-  if (IsKeyDown(KEY_W))
-    moveInput.y -= 1.0f;
-  if (IsKeyDown(KEY_S))
-    moveInput.y += 1.0f;
-  if (IsKeyDown(KEY_A))
-    moveInput.x -= 1.0f;
-  if (IsKeyDown(KEY_D))
-    moveInput.x += 1.0f;
+  
+  if (!player->isChoking) {
+      if (IsKeyDown(KEY_W)) moveInput.y -= 1.0f;
+      if (IsKeyDown(KEY_S)) moveInput.y += 1.0f;
+      if (IsKeyDown(KEY_A)) moveInput.x -= 1.0f;
+      if (IsKeyDown(KEY_D)) moveInput.x += 1.0f;
+  }
 
   player->velocity = (Vector2){0};
 
