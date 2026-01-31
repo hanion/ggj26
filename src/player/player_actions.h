@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 
-#include "../raylib/src/raylib.h"
+#include "../../raylib/src/raylib.h"
 
 #include "../entity.h"
 #include "../levels.h"

@@ -1,7 +1,7 @@
 #ifndef HUD_H
 #define HUD_H
 
-#include "entity.h"
+#include "../entity.h"
 
 // Lightweight UI/HUD module.
 // - owns any HUD textures (e.g. profile portrait)
