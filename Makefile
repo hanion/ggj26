@@ -2,6 +2,11 @@ CC = gcc
 
 # Common flags
 CFLAGS = -I./raylib/src -Isrc
+
+# Developer build flag (0 = players, 1 = developers)
+# Usage: make DEV_MODE=1
+DEV_MODE ?= 0
+CFLAGS += -DDEV_MODE=$(DEV_MODE)
 LDFLAGS = -L./raylib/src -lraylib
 
 ifeq ($(OS),Windows_NT)
@@ -20,9 +25,13 @@ endif
 
 SRC = src/main.c                \
         src/game.c               \
+    src/game_context.c       \
         src/levels.c            \
         src/episodes/episode1.c  \
-        src/player.c             \
+    src/player/player.c      \
+    src/player/player_render.c \
+    src/player/player_actions.c \
+    src/ui/hud.c             \
         src/enemies/enemy1.c    \
         src/anim.c               \
         src/episodes/episode2.c  \

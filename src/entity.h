@@ -6,7 +6,11 @@
 
 typedef enum {
   PLAYER_EQUIP_BARE_HANDS,
-  PLAYER_EQUIP_GUN
+  PLAYER_EQUIP_KNIFE,
+  PLAYER_EQUIP_FLASHLIGHT,
+  PLAYER_EQUIP_HANDGUN,
+  PLAYER_EQUIP_RIFLE,
+  PLAYER_EQUIP_SHOTGUN
 } PlayerEquipState;
 
 typedef struct {
@@ -23,6 +27,12 @@ typedef struct {
   float shootTimer; // For AI cooldown
 
   PlayerEquipState equipmentState;
+  
+  // Ammo system
+  int magAmmo;      // Current ammo in magazine
+  int reserveAmmo;  // Reserve ammo for reloading
+  bool isReloading; // Is currently reloading
+  float reloadTimer; // Timer for reload animation
 } Entity;
 
 typedef struct {

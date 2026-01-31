@@ -10,14 +10,26 @@
 #include "entity.h"
 #include "episodes/episodes.h"
 #include "levels.h"
-#include "player.h"
+#include "player/player.h"
+#include "player/player_render.h"
 #include "types.h"
+
+#include "game_context.h"
+
+#include "player/player_actions.h"
+
+#include "ui/hud.h"
 
 // Game Constants
 #define MAX_BULLETS 100
 #define BULLET_SPEED 800.0f
 #define BULLET_RADIUS 5.0f
 #define BULLET_LIFETIME 2.0f
+
+// Ammo constants
+#define MAG_SIZE 12
+#define RESERVE_AMMO_START 48
+#define RELOAD_DURATION 1.5f  // Duration of reload animation in seconds
 
 // --- GAME STATE ---
 typedef enum {
@@ -31,6 +43,8 @@ static GameState currentState;
 static Level currentLevel;
 static bool gameOver; 
 static bool gameWon; 
+
+static GameContext gameCtx;
 
 static Entity player;
 static Camera2D camera;
@@ -91,6 +105,7 @@ void DrawTextureTiled(Texture2D texture, Rectangle source, Rectangle dest, Vecto
 void Game_Init(void) {
     gameOver = false;
     gameWon = false;
+    gameCtx.hasWonLastEpisode = false;
     maskActive = false;
     currentState = STATE_PLAYING;
 
@@ -100,11 +115,43 @@ void Game_Init(void) {
     // Init Level
     InitLevel(episodeId, &currentLevel);
 
+    // Progress context
+    gameCtx.hasProgress = true;
+
     // Player
     player = InitPlayer(currentLevel.playerSpawn, currentLevel.playerStartId);
-    player.equipmentState = PLAYER_EQUIP_BARE_HANDS;
     player.rotation = 0.0f;
-    playerGunShootTimer = 0.0f;
+    player.isReloading = false;
+    player.reloadTimer = 0.0f;
+    weaponShootTimer = 0.0f;
+
+    // Story progression: if we have a saved player context AND we're starting the next episode,
+    // carry identity/equipment/ammo/inventory across.
+    bool shouldCarryPlayer = gameCtx.player.valid && (episodeId == gameCtx.nextEpisodeId);
+    if (shouldCarryPlayer) {
+        player.identity = gameCtx.player.identity;
+        player.magAmmo = gameCtx.player.magAmmo;
+        player.reserveAmmo = gameCtx.player.reserveAmmo;
+    player.equipmentState = GameContext_AllowsEquip(&gameCtx, gameCtx.player.equipped)
+                  ? gameCtx.player.equipped
+                  : PLAYER_EQUIP_KNIFE;
+    } else {
+        // Fresh episode start (new game / replay): defaults
+        player.equipmentState = PLAYER_EQUIP_KNIFE;
+        player.magAmmo = MAG_SIZE;
+        player.reserveAmmo = RESERVE_AMMO_START;
+
+        // Also reset inventory to a minimal baseline.
+    gameCtx.player.valid = true;
+    gameCtx.player.identity = player.identity;
+    gameCtx.player.equipped = player.equipmentState;
+    gameCtx.player.magAmmo = player.magAmmo;
+    gameCtx.player.reserveAmmo = player.reserveAmmo;
+    gameCtx.player.hasFlashlight = true; // optional baseline; feels nice for early game
+    gameCtx.player.hasHandgun = false;
+    gameCtx.player.hasRifle = false;
+    gameCtx.player.hasShotgun = false;
+    }
     lastEquipmentState = player.equipmentState;
 
     // Camera
@@ -130,6 +177,11 @@ void Game_Init(void) {
 void Game_Init(void) {
     currentState = STATE_MENU;
 
+    // Start a fresh story by default.
+    GameContext_Init(&gameCtx);
+
+    Hud_Init();
+
     // Define Menu Buttons (Centered)
     int sw = GetScreenWidth();
     int sh = GetScreenHeight();
@@ -140,6 +192,10 @@ void Game_Init(void) {
     btnEpisode1 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY, (float)btnWidth, (float)btnHeight };
     btnEpisode2 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 70, (float)btnWidth, (float)btnHeight };
     btnQuit     = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 140, (float)btnWidth, (float)btnHeight };
+
+    // Player-facing menu buttons reuse the same layout slots.
+    btnPlay     = btnEpisode1;
+    btnContinue = btnEpisode2;
 }
 
 // Helper for HighDPI Mouse Scaling
@@ -159,6 +215,8 @@ static void UpdateMenu(void) {
     Vector2 mousePos = GetScaledMousePosition();
 
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        // Developer build: manual episode picking.
+#if defined(DEV_MODE) && (DEV_MODE)
         if (CheckCollisionPointRec(mousePos, btnEpisode1)) {
             StartLevel(1);
         } else if (CheckCollisionPointRec(mousePos, btnEpisode2)) {
@@ -166,6 +224,21 @@ static void UpdateMenu(void) {
         } else if (CheckCollisionPointRec(mousePos, btnQuit)) {
             CloseWindow();
         }
+#else
+        // Player build: story-driven flow.
+        if (CheckCollisionPointRec(mousePos, btnPlay)) {
+            // New Game
+            gameCtx.nextEpisodeId = 1;
+            StartLevel(gameCtx.nextEpisodeId);
+        } else if (CheckCollisionPointRec(mousePos, btnContinue)) {
+            // Continue (only if player has started before)
+            if (gameCtx.hasProgress) {
+                StartLevel(gameCtx.nextEpisodeId);
+            }
+        } else if (CheckCollisionPointRec(mousePos, btnQuit)) {
+            CloseWindow();
+        }
+#endif
     }
 }
 
@@ -183,13 +256,24 @@ static void DrawMenu(void) {
     Color normalColor = GRAY;
     Vector2 mousePos = GetScaledMousePosition();
 
-    // Episode 1
+    // Developer build: manual stage/episode picking.
+#if defined(DEV_MODE) && (DEV_MODE)
     DrawRectangleRec(btnEpisode1, CheckCollisionPointRec(mousePos, btnEpisode1) ? hoverColor : normalColor);
     DrawText("EPISODE 1", btnEpisode1.x + 40, btnEpisode1.y + 15, 20, WHITE);
 
-    // Episode 2
     DrawRectangleRec(btnEpisode2, CheckCollisionPointRec(mousePos, btnEpisode2) ? hoverColor : normalColor);
     DrawText("EPISODE 2", btnEpisode2.x + 40, btnEpisode2.y + 15, 20, WHITE);
+#else
+    // Player build: story menu.
+    DrawRectangleRec(btnPlay, CheckCollisionPointRec(mousePos, btnPlay) ? hoverColor : normalColor);
+    DrawText("PLAY", btnPlay.x + 70, btnPlay.y + 15, 20, WHITE);
+
+    bool canContinue = gameCtx.hasProgress;
+    Color continueColor = canContinue ? normalColor : Fade(normalColor, 0.35f);
+    Color continueTextColor = canContinue ? WHITE : Fade(WHITE, 0.5f);
+    DrawRectangleRec(btnContinue, CheckCollisionPointRec(mousePos, btnContinue) && canContinue ? hoverColor : continueColor);
+    DrawText("CONTINUE", btnContinue.x + 45, btnContinue.y + 15, 20, continueTextColor);
+#endif
 
     // Quit
     DrawRectangleRec(btnQuit, CheckCollisionPointRec(mousePos, btnQuit) ? hoverColor : normalColor);
@@ -204,36 +288,69 @@ static void UpdateGame(float dt) {
 
     // Game Over / Win Logic Inputs
     if (gameOver || gameWon) {
-        if (IsKeyPressed(KEY_R)) {
-            StartLevel(currentLevel.id); // Restart current level
+        // GAME OVER
+        if (gameOver) {
+            if (IsKeyPressed(KEY_R)) {
+                StartLevel(currentLevel.id); // Restart current level
+            }
+            if (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_SPACE)) {
+                currentState = STATE_MENU; // Return to menu
+            }
+            return;
         }
-        if (IsKeyPressed(KEY_SPACE)) {
-            currentState = STATE_MENU; // Return to menu
+
+        // WIN
+        if (gameWon) {
+            // Update progress context (used by Continue / Next).
+            gameCtx.hasWonLastEpisode = true;
+            GameContext_SaveFromPlayer(&gameCtx, &player);
+            if (currentLevel.id == 1) {
+                gameCtx.nextEpisodeId = 2;
+            }
+
+            // Player builds: Next or Menu.
+#if !defined(DEV_MODE) || !(DEV_MODE)
+            if (IsKeyPressed(KEY_N)) {
+                StartLevel(gameCtx.nextEpisodeId);
+                return;
+            }
+            if (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_SPACE)) {
+                currentState = STATE_MENU;
+                return;
+            }
+#else
+            // Dev builds: Replay, Next, or Menu.
+            if (IsKeyPressed(KEY_R)) {
+                StartLevel(currentLevel.id);
+                return;
+            }
+            if (IsKeyPressed(KEY_N)) {
+                StartLevel(gameCtx.nextEpisodeId);
+                return;
+            }
+            if (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_SPACE)) {
+                currentState = STATE_MENU;
+                return;
+            }
+#endif
         }
         return;
     }
+    
+    // Helper function to check if player has a gun equipped
+    bool hasGunEquipped = (player.equipmentState == PLAYER_EQUIP_HANDGUN ||
+                          player.equipmentState == PLAYER_EQUIP_RIFLE ||
+                          player.equipmentState == PLAYER_EQUIP_SHOTGUN);
 
     // Player Update
     UpdatePlayer(&player, &currentLevel, dt);
 
-    // Detect equipment changes (used to kick off one-shot equip animation).
+    // Detect equipment changes
     if (player.equipmentState != lastEquipmentState) {
-        if (player.equipmentState == PLAYER_EQUIP_GUN && playerGunAnimLoaded) {
-            playerGunShootTimer = 0.0f;
-            playerGunAnimState = PLAYER_GUN_EQUIP;
-            AnimPlayer_SetClip(&playerGunAnim, &playerGunIdleClip); // takeAimGun40
-            playerGunAnim.loop = false; // play once and hold last frame
-        }
+        weaponShootTimer = 0.0f;
+    PlayerRender_OnEquip(&playerRender, player.equipmentState);
         lastEquipmentState = player.equipmentState;
     }
-    PlayerAnimState nextState =
-        Vector2Length(player.velocity) > 0.01f ? PLAYER_ANIM_WALK : PLAYER_ANIM_IDLE;
-    if (nextState != playerAnimState) {
-        playerAnimState = nextState;
-        AnimPlayer_SetClip(&playerAnim,
-                           playerAnimState == PLAYER_ANIM_WALK ? &playerWalkClip : &playerIdleClip);
-    }
-    AnimPlayer_Update(&playerAnim, dt);
 
     // Camera Update
     camera.target = Vector2Lerp(camera.target, player.position, 0.1f);
@@ -247,71 +364,89 @@ static void UpdateGame(float dt) {
     // 0 degrees from atan2 is pointing RIGHT (+X).
     // Set this offset to match how the sprite is authored.
     // If your sprite faces UP by default, start with -90
-    const float spriteFacingOffsetDeg = +90.0f;
+    const float spriteFacingOffsetDeg = 0.0f;
 
     // If rotation is mirrored (turns the wrong way), flip sign:
     // float aimDeg = -atan2f(aimDirNormalized.y, aimDirNormalized.x) * RAD2DEG;
     float aimDeg = atan2f(aimDirNormalized.y, aimDirNormalized.x) * RAD2DEG;
 
     player.rotation = aimDeg + spriteFacingOffsetDeg;
-    if (playerGunShootTimer > 0.0f) {
-        playerGunShootTimer -= dt;
-        if (playerGunShootTimer < 0.0f) {
-            playerGunShootTimer = 0.0f;
+    if (weaponShootTimer > 0.0f) {
+        weaponShootTimer -= dt;
+        if (weaponShootTimer < 0.0f) {
+            weaponShootTimer = 0.0f;
         }
     }
 
-    if (player.equipmentState == PLAYER_EQUIP_GUN && playerGunAnimLoaded) {
-        // If we're in the one-shot equip anim, let it finish before entering idle/walk.
-        if (playerGunAnimState == PLAYER_GUN_EQUIP) {
-            AnimPlayer_Update(&playerGunAnim, dt);
-            if (AnimPlayer_IsFinished(&playerGunAnim)) {
-                playerGunAnimState = PLAYER_GUN_IDLE;
-                AnimPlayer_SetClip(&playerGunAnim, &playerGunIdleClip);
-                playerGunAnim.loop = true;
-            }
-        } else {
-            PlayerGunAnimState gunNextState = PLAYER_GUN_IDLE;
-            if (playerGunShootTimer > 0.0f) {
-                gunNextState = PLAYER_GUN_SHOOT;
-            } else if (Vector2Length(player.velocity) > 0.01f) {
-                gunNextState = PLAYER_GUN_WALK;
-            }
-            if (gunNextState != playerGunAnimState) {
-                playerGunAnimState = gunNextState;
-                AnimPlayer_SetClip(&playerGunAnim,
-                                   playerGunAnimState == PLAYER_GUN_SHOOT ? &playerGunShootClip :
-                                   playerGunAnimState == PLAYER_GUN_WALK ? &playerGunWalkClip :
-                                                                           &playerGunIdleClip);
-                playerGunAnim.loop = true;
-            }
-            AnimPlayer_Update(&playerGunAnim, dt);
+    // Update all player visual animation state in one place.
+    PlayerRender_Update(&playerRender, &player, dt, weaponShootTimer);
+    
+    // Handle reload timer
+    if (player.isReloading) {
+        player.reloadTimer -= dt;
+        if (player.reloadTimer <= 0.0f) {
+            // Reload complete - transfer ammo
+            int ammoNeeded = MAG_SIZE - player.magAmmo;
+            int ammoToTransfer = ammoNeeded < player.reserveAmmo ? ammoNeeded : player.reserveAmmo;
+            player.magAmmo += ammoToTransfer;
+            player.reserveAmmo -= ammoToTransfer;
+            player.isReloading = false;
+            player.reloadTimer = 0.0f;
+        }
+    }
+
+    // Reload input (R key)
+    if (IsKeyPressed(KEY_R) && !player.isReloading) {
+        bool canReload = hasGunEquipped && player.magAmmo < MAG_SIZE && player.reserveAmmo > 0;
+        if (canReload) {
+            player.isReloading = true;
+            player.reloadTimer = RELOAD_DURATION;
         }
     }
 
     // Player Shooting
-    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-        if (player.equipmentState == PLAYER_EQUIP_GUN && HasAbility(player.identity, ABILITY_SHOOT)) {
-            for (int i = 0; i < MAX_BULLETS; i++) {
-                if (!bullets[i].active) {
-                    bullets[i].active = true;
-                    bullets[i].position = player.position;
-                    bullets[i].radius = BULLET_RADIUS;
-                    bullets[i].lifeTime = BULLET_LIFETIME;
-                    bullets[i].isPlayerOwned = true;
-                    bullets[i].velocity = Vector2Scale(aimDirNormalized, BULLET_SPEED);
-                    playerGunShootTimer = playerGunShootHold;
-                    break;
+    bool shootPressed = IsMouseButtonPressed(MOUSE_LEFT_BUTTON) || IsKeyPressed(KEY_SPACE);
+    if (shootPressed) {
+        bool canShoot = hasGunEquipped && HasAbility(player.identity, ABILITY_SHOOT) && !player.isReloading;
+        
+        if (canShoot) {
+            if (player.magAmmo > 0) {
+                // Shoot
+                for (int i = 0; i < MAX_BULLETS; i++) {
+                    if (!bullets[i].active) {
+                        bullets[i].active = true;
+                        bullets[i].position = player.position;
+                        bullets[i].radius = BULLET_RADIUS;
+                        bullets[i].lifeTime = BULLET_LIFETIME;
+                        bullets[i].isPlayerOwned = true;
+                        bullets[i].velocity = Vector2Scale(aimDirNormalized, BULLET_SPEED);
+                        weaponShootTimer = weaponShootHold;
+                        player.magAmmo--;
+                        break;
+                    }
+                }
+            } else {
+                // Auto-reload when trying to shoot with empty mag
+                if (player.reserveAmmo > 0) {
+                    player.isReloading = true;
+                    player.reloadTimer = RELOAD_DURATION;
                 }
             }
         }
     }
 
     meleeTargetIndex = -1;
-    if (player.equipmentState == PLAYER_EQUIP_BARE_HANDS) {
-        meleeTargetIndex = GetClosestEnemyInRange(player.position, meleeRange);
+    if (player.equipmentState == PLAYER_EQUIP_KNIFE || 
+        player.equipmentState == PLAYER_EQUIP_FLASHLIGHT ||
+        player.equipmentState == PLAYER_EQUIP_BARE_HANDS) {
+        meleeTargetIndex = PlayerActions_GetClosestEnemyInRange(&currentLevel, player.position, meleeRange);
         if (meleeTargetIndex != -1 && IsKeyPressed(KEY_E)) {
-            HandleEnemyKilled(meleeTargetIndex);
+            PlayerActions_HandleEnemyKilled(&currentLevel,
+                                            meleeTargetIndex,
+                                            &player,
+                                            &droppedMask,
+                                            &maskActive,
+                                            droppedMaskRadius);
             meleeTargetIndex = -1;
         }
     }
@@ -351,7 +486,12 @@ static void UpdateGame(float dt) {
                     CheckCollisionCircles(bullets[i].position, bullets[i].radius,
                                           currentLevel.enemies[e].position, currentLevel.enemies[e].radius)) {
                     bullets[i].active = false;
-                    HandleEnemyKilled(e);
+                    PlayerActions_HandleEnemyKilled(&currentLevel,
+                                                    e,
+                                                    &player,
+                                                    &droppedMask,
+                                                    &maskActive,
+                                                    droppedMaskRadius);
                 }
             }
         } else {
@@ -402,11 +542,20 @@ static void DrawGame(void) {
         if (gameOver) {
             DrawText("GAME OVER", sw / 2 - 100, sh / 2 - 20, 40, RED);
             DrawText("Press R to Restart Level", sw / 2 - 100, sh / 2 + 30, 20, RAYWHITE);
-            DrawText("Press SPACE to Menu", sw / 2 - 100, sh / 2 + 60, 20, RAYWHITE);
+            DrawText("Press M to Menu", sw / 2 - 100, sh / 2 + 60, 20, RAYWHITE);
         } else {
             DrawText("EPISODE COMPLETE!", sw / 2 - 150, sh / 2 - 20, 40, GOLD);
+            // Player builds: Next + Menu.
+#if !defined(DEV_MODE) || !(DEV_MODE)
+            DrawText("Press N to Next", sw / 2 - 100, sh / 2 + 30, 20, RAYWHITE);
+            DrawText("Press M to Menu", sw / 2 - 100, sh / 2 + 60, 20, RAYWHITE);
+            DrawText("(Saving will be added later)", sw / 2 - 130, sh / 2 + 90, 18, Fade(RAYWHITE, 0.7f));
+#else
+            // Dev builds: Replay still useful.
             DrawText("Press R to Replay", sw / 2 - 100, sh / 2 + 30, 20, RAYWHITE);
-            DrawText("Press SPACE to Menu", sw / 2 - 100, sh / 2 + 60, 20, RAYWHITE);
+            DrawText("Press N to Next", sw / 2 - 100, sh / 2 + 60, 20, RAYWHITE);
+            DrawText("Press M to Menu", sw / 2 - 100, sh / 2 + 90, 20, RAYWHITE);
+#endif
         }
     } else {
         BeginMode2D(camera);
@@ -515,24 +664,11 @@ static void DrawGame(void) {
             }
         }
 
-        if (playerAnimLoaded) {
-            Texture2D frame = AnimPlayer_GetFrame(&playerAnim);
-            if (player.equipmentState == PLAYER_EQUIP_GUN && playerGunAnimLoaded) {
-                Texture2D gunFrame = AnimPlayer_GetFrame(&playerGunAnim);
-                if (gunFrame.id != 0) {
-                    frame = gunFrame;
-                }
-            }
-            if (playerShadow.id != 0 && frame.id != 0) {
-                DrawPlayerShadow(playerShadow, player.position);
-            }
-            if (frame.id != 0) {
-                DrawPlayerFrame(frame, player.position, player.rotation);
-            } else {
-                DrawPlayerFallback(player.position, player.radius);
-            }
+        if (playerRender.loaded) {
+            PlayerRender_Draw(&playerRender, &player);
+            PlayerRender_DrawMuzzleFlash(&playerRender, &player, weaponShootTimer);
         } else {
-            DrawPlayerFallback(player.position, player.radius);
+            PlayerRender_DrawFallback(player.position, player.radius);
         }
         if (meleeTargetIndex >= 0 && meleeTargetIndex < currentLevel.enemyCount &&
             currentLevel.enemies[meleeTargetIndex].active) {
@@ -553,11 +689,8 @@ static void DrawGame(void) {
         DrawLineV(player.position, mouseWorld, Fade(WHITE, 0.2f));
         EndMode2D();
 
-        // HUD
-        DrawText(TextFormat("CURRENT LEVEL: %d", player.identity.permissionLevel),
-                 20, 20, 20, WHITE);
-        DrawText(player.equipmentState == PLAYER_EQUIP_GUN ? "EQUIP: GUN" : "EQUIP: HANDS",
-                 20, 45, 16, WHITE);
+    // HUD
+    Hud_DrawPlayer(&player);
     }
 
     EndDrawing();
