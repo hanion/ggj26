@@ -2,6 +2,9 @@
 #include "game.h"
 
 int main(void) {
+#if defined(__APPLE__)
+  SetConfigFlags(FLAG_WINDOW_HIGHDPI);
+#endif
   InitWindow(0, 0,
              "Identity Theft - Modular");
   SetTargetFPS(60);

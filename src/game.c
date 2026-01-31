@@ -20,9 +20,17 @@
 #define BULLET_LIFETIME 2.0f
 
 // --- GAME STATE ---
+typedef enum {
+    STATE_MENU,
+    STATE_PLAYING,
+    STATE_GAMEOVER,
+    STATE_WIN
+} GameState;
+
+static GameState currentState;
 static Level currentLevel;
-static bool gameOver;
-static bool gameWon;
+static bool gameOver; 
+static bool gameWon; 
 
 static Entity player;
 static Camera2D camera;
@@ -190,16 +198,23 @@ static void HandleEnemyKilled(int enemyIndex) {
     }
 }
 
-void Game_Init(void) {
+// --- MENU BUTTONS ---
+static Rectangle btnEpisode1;
+static Rectangle btnEpisode2;
+static Rectangle btnQuit;
+
+// Helper to reset game state for a specific level
+static void StartLevel(int episodeId) {
     gameOver = false;
     gameWon = false;
     maskActive = false;
+    currentState = STATE_PLAYING;
 
     // Reset bullets
     for (int i = 0; i < MAX_BULLETS; i++) bullets[i].active = false;
 
     // Init Level
-    InitLevel(1, &currentLevel);
+    InitLevel(episodeId, &currentLevel);
 
     // Player
     player = InitPlayer(currentLevel.playerSpawn, currentLevel.playerStartId);
@@ -232,8 +247,8 @@ void Game_Init(void) {
     }
     playerIdleClip = LoadAnimClip("assets/character/LightArtilleryRobot/idle60", 30.0f);
     playerWalkClip = LoadAnimClip("assets/character/LightArtilleryRobot/walk60", 60.0f);
-    playerGunIdleClip = LoadAnimClip("assets/character/LightArtilleryRobot/takeAimGun40", 30.0f);
-    playerGunWalkClip = LoadAnimClip("assets/character/LightArtilleryRobot/takeAimGun40", 60.0f);
+    playerGunIdleClip = LoadAnimClip("assets/character/LightArtilleryRobot/idle60", 30.0f);
+    playerGunWalkClip = LoadAnimClip("assets/character/LightArtilleryRobot/walk60", 60.0f);
     playerGunShootClip = LoadAnimClip("assets/character/LightArtilleryRobot/shootGun20", 60.0f);
     playerShadow = LoadTexture("assets/character/LightArtilleryRobot/shadow.png");
     playerAnimLoaded = playerIdleClip.frame_count > 0 && playerWalkClip.frame_count > 0 &&
@@ -258,16 +273,88 @@ void Game_Init(void) {
     }
 }
 
-void Game_Update(void) {
-    float dt = GetFrameTime();
+void Game_Init(void) {
+    currentState = STATE_MENU;
 
+    // Define Menu Buttons (Centered)
+    int sw = GetScreenWidth();
+    int sh = GetScreenHeight();
+    int btnWidth = 200;
+    int btnHeight = 50;
+    int startY = sh / 2 - 50;
+
+    btnEpisode1 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY, (float)btnWidth, (float)btnHeight };
+    btnEpisode2 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 70, (float)btnWidth, (float)btnHeight };
+    btnQuit     = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 140, (float)btnWidth, (float)btnHeight };
+}
+
+// Helper for HighDPI Mouse Scaling
+static Vector2 GetScaledMousePosition(void) {
+    Vector2 mousePos = GetMousePosition();
+    float scaleX = (float)GetScreenWidth() / (float)GetRenderWidth();
+    float scaleY = (float)GetScreenHeight() / (float)GetRenderHeight();
+
+    if (GetScreenWidth() > 0 && GetRenderWidth() > 0) {
+        mousePos.x *= scaleX;
+        mousePos.y *= scaleY;
+    }
+    return mousePos;
+}
+
+static void UpdateMenu(void) {
+    Vector2 mousePos = GetScaledMousePosition();
+
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        if (CheckCollisionPointRec(mousePos, btnEpisode1)) {
+            StartLevel(1);
+        } else if (CheckCollisionPointRec(mousePos, btnEpisode2)) {
+            StartLevel(2);
+        } else if (CheckCollisionPointRec(mousePos, btnQuit)) {
+            CloseWindow();
+        }
+    }
+}
+
+static void DrawMenu(void) {
+    BeginDrawing();
+    ClearBackground((Color){20, 20, 25, 255});
+
+    int sw = GetScreenWidth();
+    int btnWidth = 200;
+
+    DrawText("GGJ26 - MASK INFILTRATION", sw/2 - 200, 100, 30, RAYWHITE);
+
+    // Buttons
+    Color hoverColor = (Color){50, 50, 60, 255};
+    Color normalColor = GRAY;
+    Vector2 mousePos = GetScaledMousePosition();
+
+    // Episode 1
+    DrawRectangleRec(btnEpisode1, CheckCollisionPointRec(mousePos, btnEpisode1) ? hoverColor : normalColor);
+    DrawText("EPISODE 1", btnEpisode1.x + 40, btnEpisode1.y + 15, 20, WHITE);
+
+    // Episode 2
+    DrawRectangleRec(btnEpisode2, CheckCollisionPointRec(mousePos, btnEpisode2) ? hoverColor : normalColor);
+    DrawText("EPISODE 2", btnEpisode2.x + 40, btnEpisode2.y + 15, 20, WHITE);
+
+    // Quit
+    DrawRectangleRec(btnQuit, CheckCollisionPointRec(mousePos, btnQuit) ? hoverColor : normalColor);
+    DrawText("QUIT", btnQuit.x + 75, btnQuit.y + 15, 20, WHITE);
+    
+    EndDrawing();
+}
+
+static void UpdateGame(float dt) {
     // Update Camera Offset
     camera.offset = (Vector2){ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f };
 
     // Game Over / Win Logic Inputs
     if (gameOver || gameWon) {
         if (IsKeyPressed(KEY_R)) {
-            Game_Init(); // Restart
+            StartLevel(currentLevel.id); // Restart current level
+        }
+        if (IsKeyPressed(KEY_SPACE)) {
+            currentState = STATE_MENU; // Return to menu
         }
         return;
     }
@@ -393,6 +480,12 @@ void Game_Update(void) {
                 bullets[i].active = false;
             }
         }
+        // Check Door Collisions
+        for (int d = 0; d < currentLevel.doorCount; d++) {
+            if (CheckCollisionCircleRec(bullets[i].position, bullets[i].radius, currentLevel.doors[d])) {
+                bullets[i].active = false;
+            }
+        }
         if (!bullets[i].active) continue;
 
         if (bullets[i].isPlayerOwned) {
@@ -436,11 +529,11 @@ void Game_Update(void) {
 
     // Win Condition
     if (player.position.x > currentLevel.winX) {
-        gameWon = true;
+        gameWon = true; // Win current level
     }
 }
 
-void Game_Draw(void) {
+static void DrawGame(void) {
     BeginDrawing();
     ClearBackground((Color){20, 20, 25, 255});
 
@@ -451,9 +544,11 @@ void Game_Draw(void) {
         if (gameOver) {
             DrawText("GAME OVER", sw / 2 - 100, sh / 2 - 20, 40, RED);
             DrawText("Press R to Restart Level", sw / 2 - 100, sh / 2 + 30, 20, RAYWHITE);
+            DrawText("Press SPACE to Menu", sw / 2 - 100, sh / 2 + 60, 20, RAYWHITE);
         } else {
             DrawText("EPISODE COMPLETE!", sw / 2 - 150, sh / 2 - 20, 40, GOLD);
             DrawText("Press R to Replay", sw / 2 - 100, sh / 2 + 30, 20, RAYWHITE);
+            DrawText("Press SPACE to Menu", sw / 2 - 100, sh / 2 + 60, 20, RAYWHITE);
         }
     } else {
         BeginMode2D(camera);
@@ -549,15 +644,27 @@ void Game_Draw(void) {
                  20, 20, 20, WHITE);
         DrawText(player.equipmentState == PLAYER_EQUIP_GUN ? "EQUIP: GUN" : "EQUIP: HANDS",
                  20, 45, 16, WHITE);
-
-        if (gameWon) {
-            int sw = GetScreenWidth();
-            DrawText("WINNER!", sw / 2 - 50, 100, 40, GOLD);
-        }
     }
 
     EndDrawing();
 }
+
+void Game_Update(void) {
+    if (currentState == STATE_MENU) {
+        UpdateMenu();
+    } else {
+        UpdateGame(GetFrameTime());
+    }
+}
+
+void Game_Draw(void) {
+    if (currentState == STATE_MENU) {
+        DrawMenu();
+    } else {
+        DrawGame();
+    }
+}
+
 
 void Game_Shutdown(void) {
     UnloadAnimClip(&playerIdleClip);
@@ -572,3 +679,4 @@ void Game_Shutdown(void) {
     playerAnimLoaded = false;
     playerGunAnimLoaded = false;
 }
+
