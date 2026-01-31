@@ -24,6 +24,7 @@ SRC = src/main.c                \
         src/episodes/episode1.c  \
     src/player/player.c      \
     src/player/player_render.c \
+    src/ui/hud.c             \
         src/enemies/enemy1.c    \
         src/anim.c               \
         src/episodes/episode2.c  \
