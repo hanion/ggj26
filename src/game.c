@@ -1,5 +1,6 @@
 // Standard
 #include <math.h>
+#include <stdio.h>
 
 // External
 #include "../raylib/src/raylib.h"
@@ -12,17 +13,18 @@
 #include "game_context.h"
 #include "entity.h"
 #include "levels.h"
+#include "anim.h"
 #include "gameplay_helpers.h"
 
 // Game Modules
+#include "episodes/episodes.h"
 #include "enemies/enemy.h"
 #include "player/player.h"
 #include "player/player_actions.h"
 #include "player/player_render.h"
 #include "ui/hud.h"
 #include "types.h"
-
-#include "editor.c"
+#include "anim.h"
 
 // Game Constants
 #define MAX_BULLETS 100
@@ -45,7 +47,6 @@ typedef enum {
 
 static GameState currentState;
 static Level currentLevel;
-LevelEditor editor;
 static bool gameOver; 
 static bool gameWon; 
 
@@ -75,6 +76,39 @@ static void UpdateGame(float dt);
 static PlayerEquipState MapGunToEquip(GunType type);
 
 
+static Texture2D texZone1;
+static Texture2D texZone2;
+static Texture2D texZone3;
+static Texture2D texZone4;
+static Texture2D texZone5;
+static Texture2D texZone6;
+static Texture2D texZone7;
+
+// Epilog map
+static Texture2D texEpilogMap;
+static const float EPILOG_WORLD_SCALE = 2.0f;
+
+// Epilog NPC animations
+// Replace manual frame arrays with AnimClip so it matches the rest of the project's animation system.
+static AnimClip animKizIdle = {0};
+static bool animKizIdleLoaded = false;
+static AnimPlayer animPlayerKiz = {0};
+static bool animPlayerKizInit = false;
+
+static AnimClip animSigaraciIdle = {0};
+static bool animSigaraciIdleLoaded = false;
+static AnimPlayer animPlayerSigaraci = {0};
+static bool animPlayerSigaraciInit = false;
+
+static AnimClip animBalikciIdle = {0};
+static bool animBalikciIdleLoaded = false;
+static AnimPlayer animPlayerBalikci = {0};
+static bool animPlayerBalikciInit = false;
+
+static const float KIZ_IDLE_FPS = 6.0f;
+static const float SIGARACI_IDLE_FPS = 6.0f;
+static const float BALIKCI_IDLE_FPS = 6.0f;
+static const float EPILOG_NPC_SCALE = 0.35f;
 
 // --- RENDER & GAMEPLAY STATES ---
 static PlayerRender playerRender;
@@ -88,12 +122,21 @@ static float meleeRange = 80.0f;
 static float meleePromptOffset = 40.0f;
 static float meleePromptHorizontalOffset = 40.0f;
 static float droppedMaskRadius = 15.0f;
+static int npcPromptIndex = -1;
+static int npcInteractionIndex = -1;
+static float npcInteractionTimer = 0.0f;
+static float npcInteractionRange = 80.0f;
+static float npcPromptHorizontalOffset = 25.0f;
+static float npcPromptVerticalOffset = 30.0f;
+static float npcLabelHorizontalOffset = 20.0f;
+static float npcLabelVerticalOffset = 45.0f;
 
 // Debug
 static bool playerDebugDraw = false;
 static float playerDebugCrossSize = 10.0f;
 
 // Menu Buttons
+static Rectangle btnEpilog;
 static Rectangle btnEpisode1;
 static Rectangle btnEpisode2;
 static Rectangle btnQuit;
@@ -144,13 +187,7 @@ void DrawTextureTiled(Texture2D texture, Rectangle source, Rectangle dest, Vecto
 // --- FOG OF WAR STATE ---
 static bool visitedZones[7];
 
-void EndLevel(int id);
-
 void StartLevel(int id) {
-	if (id) {
-		EndLevel(id);
-	}
-	editor = LevelEditor_new(&currentLevel);
     gameOver = false;
     gameWon = false;
     gameCtx.hasWonLastEpisode = false;
@@ -211,15 +248,61 @@ void StartLevel(int id) {
     camera.rotation = 0.0f;
     camera.zoom = 1.0f;
 
+    // Load Textures
+    if (texEpilogMap.id == 0) texEpilogMap = LoadTexture("assets/map/prolog/epilog_map.png");
+
+    // Only load Epilog NPC animation when entering Epilog.
+    if (id == 0) {
+        if (!animKizIdleLoaded) {
+            animKizIdle = LoadAnimClip("assets/street_animation/kiz_cocuk", KIZ_IDLE_FPS);
+            animKizIdleLoaded = true;
+        }
+        if (animKizIdleLoaded) {
+            AnimPlayer_SetClip(&animPlayerKiz, &animKizIdle);
+            animPlayerKiz.loop = true;
+            animPlayerKiz.frame_index = 0;
+            animPlayerKiz.time = 0.0f;
+            animPlayerKizInit = true;
+        }
+
+        if (!animSigaraciIdleLoaded) {
+            animSigaraciIdle = LoadAnimClip("assets/street_animation/sigaraci", SIGARACI_IDLE_FPS);
+            animSigaraciIdleLoaded = true;
+        }
+        if (animSigaraciIdleLoaded) {
+            AnimPlayer_SetClip(&animPlayerSigaraci, &animSigaraciIdle);
+            animPlayerSigaraci.loop = true;
+            animPlayerSigaraci.frame_index = 0;
+            animPlayerSigaraci.time = 0.0f;
+            animPlayerSigaraciInit = true;
+        }
+
+        if (!animBalikciIdleLoaded) {
+            animBalikciIdle = LoadAnimClip("assets/street_animation/balikci", BALIKCI_IDLE_FPS);
+            animBalikciIdleLoaded = true;
+        }
+        if (animBalikciIdleLoaded) {
+            AnimPlayer_SetClip(&animPlayerBalikci, &animBalikciIdle);
+            animPlayerBalikci.loop = true;
+            animPlayerBalikci.frame_index = 0;
+            animPlayerBalikci.time = 0.0f;
+            animPlayerBalikciInit = true;
+        }
+    }
+
+    if (texZone1.id == 0)texZone1 = LoadTexture("assets/environment/background_1.png");
+    if (texZone2.id == 0)texZone2 = LoadTexture("assets/environment/background_2.png");
+    if (texZone3.id == 0)texZone3 = LoadTexture("assets/environment/background_3.png");
+    if (texZone4.id == 0)texZone4 = LoadTexture("assets/environment/background_4.png");
+    if (texZone5.id == 0)texZone5 = LoadTexture("assets/environment/background_5.png");
+    if (texZone6.id == 0)texZone6 = LoadTexture("assets/environment/background_6.png");
+    if (texZone7.id == 0)texZone7 = LoadTexture("assets/environment/background_7.png");
+
     // Init Player Render
     PlayerRender_Init(&playerRender);
     PlayerRender_LoadEpisodeAssets(&playerRender);
     PlayerRender_OnEquip(&playerRender, lastEquipmentState);
 }
-
-void EndLevel(int id) {
-}
-
 
 void Game_Init(void) {
     currentState = STATE_MENU;
@@ -236,13 +319,14 @@ void Game_Init(void) {
     int btnHeight = 50;
     int startY = sh / 2 - 50;
 
-    btnEpisode1 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY, (float)btnWidth, (float)btnHeight };
-    btnEpisode2 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 70, (float)btnWidth, (float)btnHeight };
-    btnQuit     = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 140, (float)btnWidth, (float)btnHeight };
+    btnEpilog   = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY, (float)btnWidth, (float)btnHeight };
+    btnEpisode1 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 70, (float)btnWidth, (float)btnHeight };
+    btnEpisode2 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 140, (float)btnWidth, (float)btnHeight };
+    btnQuit     = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 210, (float)btnWidth, (float)btnHeight };
     
     // Player-facing menu buttons reuse the same layout slots.
-    btnPlay     = btnEpisode1;
-    btnContinue = btnEpisode2;
+    btnPlay     = btnEpilog;
+    btnContinue = btnEpisode1;
 }
 
 // Helper for HighDPI Mouse Scaling
@@ -262,7 +346,9 @@ static bool UpdateMenu(void) {
     Vector2 mousePos = GetScaledMousePosition();
 
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-        if (CheckCollisionPointRec(mousePos, btnEpisode1)) {
+        if (CheckCollisionPointRec(mousePos, btnEpilog)) {
+            StartLevel(0);
+        } else if (CheckCollisionPointRec(mousePos, btnEpisode1)) {
             StartLevel(1);
         } else if (CheckCollisionPointRec(mousePos, btnEpisode2)) {
             StartLevel(2);
@@ -286,6 +372,10 @@ static void DrawMenu(void) {
     Color hoverColor = (Color){50, 50, 60, 255};
     Color normalColor = GRAY;
     Vector2 mousePos = GetScaledMousePosition();
+
+    // Epilog
+    DrawRectangleRec(btnEpilog, CheckCollisionPointRec(mousePos, btnEpilog) ? hoverColor : normalColor);
+    DrawText("EPILOG", btnEpilog.x + 55, btnEpilog.y + 15, 20, WHITE);
 
     // Episode 1
     DrawRectangleRec(btnEpisode1, CheckCollisionPointRec(mousePos, btnEpisode1) ? hoverColor : normalColor);
@@ -315,77 +405,45 @@ static PlayerEquipState MapGunToEquip(GunType type) {
 }
 
 static void UpdateGame(float dt) {
-	camera.offset = (Vector2){ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f };
-	float scale_x = GetScreenWidth()  / 1920.0f;
-	float scale_y = GetScreenHeight() / 1080.0f;
-	camera.zoom = 1.5f*fminf(scale_x, scale_y);
+    camera.offset = (Vector2){ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f };
+    float scale_x = GetScreenWidth()  / 1920.0f;
+    float scale_y = GetScreenHeight() / 1080.0f;
+    camera.zoom = 1.5f*fminf(scale_x, scale_y);
 
+    if (IsKeyPressed(KEY_F1)) playerDebugDraw = !playerDebugDraw;
+    if (IsKeyPressed(KEY_F)) developerMode = !developerMode;
 
-    // Debug Toggle F1
-    if (IsKeyPressed(KEY_F1)) {
-        playerDebugDraw = !playerDebugDraw;
-    }
-    
-    // Developer Mode Toggle F
-    if (IsKeyPressed(KEY_F)) {
-        developerMode = !developerMode;
-    }
-
-    // Game Over / Win Logic Inputs
     if (gameOver || gameWon) {
-        // GAME OVER
         if (gameOver) {
-            if (IsKeyPressed(KEY_R)) {
-                StartLevel(currentLevel.id); // Restart current level
-            }
-            if (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_SPACE)) {
-                currentState = STATE_MENU; // Return to menu
-            }
+            if (IsKeyPressed(KEY_R)) StartLevel(currentLevel.id);
+            if (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_SPACE)) currentState = STATE_MENU;
             return;
         }
-
-        // WIN
         if (gameWon) {
-            // Update progress context (used by Continue / Next).
             gameCtx.hasWonLastEpisode = true;
             GameContext_SaveFromPlayer(&gameCtx, &player);
-            if (currentLevel.id == 1) {
-                gameCtx.nextEpisodeId = 2;
-            }
+            if (currentLevel.id == 0) gameCtx.nextEpisodeId = 1;
+            if (currentLevel.id == 1) gameCtx.nextEpisodeId = 2;
 
-            // Player builds: Next or Menu.
-#if !defined(DEV_MODE) || !(DEV_MODE)
-            if (IsKeyPressed(KEY_N)) {
-                StartLevel(gameCtx.nextEpisodeId);
-                return;
-            }
-            if (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_SPACE)) {
-                currentState = STATE_MENU;
-                return;
-            }
-#else
-            // Dev builds: Replay, Next, or Menu.
-            if (IsKeyPressed(KEY_R)) {
-                StartLevel(currentLevel.id);
-                return;
-            }
-            if (IsKeyPressed(KEY_N)) {
-                StartLevel(gameCtx.nextEpisodeId);
-                return;
-            }
-            if (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_SPACE)) {
-                currentState = STATE_MENU;
-                return;
-            }
+            if (IsKeyPressed(KEY_N)) { StartLevel(gameCtx.nextEpisodeId); return; }
+            if (IsKeyPressed(KEY_M) || IsKeyPressed(KEY_SPACE)) { currentState = STATE_MENU; return; }
+#if defined(DEV_MODE) && (DEV_MODE)
+            if (IsKeyPressed(KEY_R)) { StartLevel(currentLevel.id); return; }
 #endif
         }
         return;
     }
 
-    // Level Start Countdown
     if (levelStartTimer > 0) {
         levelStartTimer -= dt;
-        return; // Don't update player or enemies yet
+        return;
+    }
+
+    // Epilog NPC animation tick
+    if (currentLevel.id == 0) {
+        if (animPlayerKizInit) AnimPlayer_Update(&animPlayerKiz, dt);
+        if (animPlayerSigaraciInit) AnimPlayer_Update(&animPlayerSigaraci, dt);
+        if (animPlayerBalikciInit) AnimPlayer_Update(&animPlayerBalikci, dt);
     }
     
     // --- INVENTORY INPUTS ---
@@ -393,17 +451,6 @@ static void UpdateGame(float dt) {
     if (IsKeyPressed(KEY_ONE)) player.inventory.currentGunIndex = 0;
     if (IsKeyPressed(KEY_TWO)) player.inventory.currentGunIndex = 1;
     if (IsKeyPressed(KEY_THREE)) player.inventory.currentGunIndex = 2;
-
-    float wheelMove = GetMouseWheelMove();
-    if (wheelMove != 0.0f) {
-        if (wheelMove > 0) {
-            player.inventory.currentGunIndex--;
-            if (player.inventory.currentGunIndex < 0) player.inventory.currentGunIndex = 2;
-        } else {
-            player.inventory.currentGunIndex++;
-            if (player.inventory.currentGunIndex > 2) player.inventory.currentGunIndex = 0;
-        }
-    }
 
     // Mask Switching
     if (IsKeyPressed(KEY_FOUR)) player.inventory.currentMaskIndex = 0;
@@ -425,8 +472,19 @@ static void UpdateGame(float dt) {
             currentMask->isActive = false;
         }
     }
+
+    // Update Mask Timers
+    for(int i=0; i<3; i++) {
+        if (player.inventory.maskSlots[i].isActive) {
+             player.inventory.maskSlots[i].currentTimer -= dt;
+             if (player.inventory.maskSlots[i].currentTimer <= 0) {
+                 player.inventory.maskSlots[i].isActive = false;
+                 player.inventory.maskSlots[i].type = MASK_NONE; // Break
+             }
+        }
+    }
     
-    bool hasGunEquipped = (currentGun->type != GUN_NONE);// && currentGun->type != GUN_KNIFE);
+    bool hasGunEquipped = (currentGun->type != GUN_NONE && currentGun->type != GUN_KNIFE);
 
     // Player Update
     UpdatePlayer(&player, &currentLevel, dt, developerMode);
@@ -502,7 +560,6 @@ static void UpdateGame(float dt) {
                         bullets[i].lifeTime = BULLET_LIFETIME;
                         bullets[i].isPlayerOwned = true;
                         bullets[i].velocity = Vector2Scale(aimDirNormalized, BULLET_SPEED);
-                        bullets[i].damage = currentGun->damage; // Use gun damage stats
                         
                         currentGun->currentAmmo--;
                         weaponShootTimer = currentGun->cooldown;
@@ -526,84 +583,56 @@ static void UpdateGame(float dt) {
         } else if (currentGun->type == GUN_KNIFE && weaponShootTimer <= 0) {
              // Knife attack (visual only here, logic is melee below)
              weaponShootTimer = currentGun->cooldown; 
-        }
+    }
     }
 
-    // 3. Melee Logic (Knife / Choke / Stealth Kill)
+    // 3. Melee Logic (Knife / Stealth Kill)
     meleeTargetIndex = -1;
-    
-    // Check for Choke Target (Always check range for UI prompt)
-    int chokeTarget = PlayerActions_GetClosestEnemyInRange(&currentLevel, player.position, 80.0f); // Increased range from 40->80
-    if (chokeTarget != -1) {
-        meleeTargetIndex = chokeTarget; // Set for UI prompt usage
-    }
-
-    // Choke Logic (Hold E)
-    if (IsKeyDown(KEY_E)) {
-         if (!player.isChoking) {
-             // START CHOKING
-             // 1. Find target
-             int potentialTarget = PlayerActions_GetClosestEnemyInRange(&currentLevel, player.position, 80.0f);
-             if (potentialTarget != -1) {
-                 Entity *tgt = &currentLevel.enemies[potentialTarget];
-                 // 2. Check visibility (Stealth)
-                 bool seen = CheckLineOfSight(tgt, player.position, &currentLevel);
-                 if (!seen && tgt->active) {
-                     // 3. Start Choke
-                     player.isChoking = true;
-                     player.chokeTargetIndex = potentialTarget;
-                     player.chokeTimer = 0.0f;
-                     tgt->state = STATE_BEING_CHOKED;
-                 }
-             }
-         } else {
-             // CONTINUE CHOKING
-             Entity *tgt = &currentLevel.enemies[player.chokeTargetIndex];
-             if (tgt->active && tgt->state == STATE_BEING_CHOKED) {
-                 player.chokeTimer += dt;
-                 
-                 // Lock positions (optional, or just disable movement inputs)
-                 // Note: Input handling below should respect isChoking flag to disable movement.
-                 
-                 if (player.chokeTimer >= 1.0f) {
-                     // KILL
-                     PlayerActions_ApplyDamage(&currentLevel, player.chokeTargetIndex, 1000.0f, &player, droppedMasks, MAX_MASKS, droppedMaskRadius, droppedCards, MAX_CARDS, droppedGuns, MAX_DROPPED_GUNS);
-                     player.isChoking = false;
-                     // tgt state handled by ApplyDamage (likely inactive)
-                 }
-             } else {
-                 // Target died or invalid
-                 player.isChoking = false;
-             }
-         }
-    } else {
-        // RELEASED E
-        if (player.isChoking) {
-            // Cancel Choke
-             Entity *tgt = &currentLevel.enemies[player.chokeTargetIndex];
-             if (tgt->active && tgt->state == STATE_BEING_CHOKED) {
-                 tgt->state = STATE_ATTACK; // Alerted!
-             }
-             player.isChoking = false;
-             player.chokeTimer = 0.0f;
+    if (currentGun->type == GUN_KNIFE || currentGun->type == GUN_NONE) {
+        meleeTargetIndex = PlayerActions_GetClosestEnemyInRange(&currentLevel, player.position, meleeRange);
+        if (meleeTargetIndex != -1 && IsKeyPressed(KEY_E)) {
+            PlayerActions_HandleEnemyKilled(&currentLevel,
+                                            meleeTargetIndex,
+                                            &player,
+                                            droppedMasks,
+                                            MAX_MASKS,
+                                            droppedMaskRadius,
+                                            droppedCards,
+                                            MAX_CARDS,
+                                            droppedGuns,
+                                            MAX_DROPPED_GUNS);
+            meleeTargetIndex = -1;
         }
     }
-    
-    // Knife Logic (Left Click if Knife is equipped)
-    if (currentGun->type == GUN_KNIFE && IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && weaponShootTimer <= 0) {
-         // Use the gun's range (should be 100.0f)
-         int knifeTarget = PlayerActions_GetClosestEnemyInRange(&currentLevel, player.position, currentGun->range);
-         if (knifeTarget != -1) {
-             // Knife Damage = 50
-             PlayerActions_ApplyDamage(&currentLevel, knifeTarget, currentGun->damage, &player, droppedMasks, MAX_MASKS, droppedMaskRadius, droppedCards, MAX_CARDS, droppedGuns, MAX_DROPPED_GUNS);
-             PlaySound(fxShoot); // Just using shoot sound for now
-         }
-         weaponShootTimer = currentGun->cooldown;
+
+    // 3.5 NPC Interaction
+    npcPromptIndex = -1;
+    if (currentLevel.id == 0) {
+        float closestDist = npcInteractionRange;
+        for (int i = 0; i < currentLevel.enemyCount; i++) {
+            if (!currentLevel.enemies[i].active || currentLevel.enemies[i].isEnemy || !currentLevel.enemies[i].isInteractive) {
+                continue;
+            }
+            float dist = Vector2Distance(player.position, currentLevel.enemies[i].position);
+            if (dist < closestDist) {
+                closestDist = dist;
+                npcPromptIndex = i;
+            }
+        }
+
+        if (npcPromptIndex != -1 && IsKeyPressed(KEY_E)) {
+            npcInteractionIndex = npcPromptIndex;
+            npcInteractionTimer = 2.0f;
+        }
     }
-    
-    // Legacy E key removal or remapping?
-    // User said "not E anymore" for choking.
-    // So removing E key logic block.
+
+    if (npcInteractionTimer > 0.0f) {
+        npcInteractionTimer -= dt;
+        if (npcInteractionTimer <= 0.0f) {
+            npcInteractionTimer = 0.0f;
+            npcInteractionIndex = -1;
+        }
+    }
 
     // 4. Update Bullets
     for (int i = 0; i < MAX_BULLETS; i++) {
@@ -623,8 +652,8 @@ static void UpdateGame(float dt) {
         // Door Collision (Closed)
         if (!hit) {
             for (int d = 0; d < currentLevel.doorCount; d++) {
-                if (!currentLevel.doors[d].isOpen &&
-                    CheckCollisionCircleRec(bullets[i].position, bullets[i].radius, currentLevel.doors[d].rect)) {
+                if (!currentLevel.doorsOpen[d] &&
+                    CheckCollisionCircleRec(bullets[i].position, bullets[i].radius, currentLevel.doors[d])) {
                     hit = true; break;
                 }
             }
@@ -639,21 +668,10 @@ static void UpdateGame(float dt) {
         if (bullets[i].isPlayerOwned) {
             // Hit Enemy?
             for (int e = 0; e < currentLevel.enemyCount; e++) {
-                if (currentLevel.enemies[e].active) {
+                if (currentLevel.enemies[e].active && currentLevel.enemies[e].isEnemy) {
                     if (CheckCollisionCircles(bullets[i].position, bullets[i].radius, currentLevel.enemies[e].position, currentLevel.enemies[e].radius)) {
-                        // Kill Enemy -> DAMAGE
-                        PlayerActions_ApplyDamage(&currentLevel, 
-                                                e, 
-                                                bullets[i].damage, // Use Bullet Damage
-                                                &player, 
-                                                droppedMasks, 
-                                                MAX_MASKS, 
-                                                droppedMaskRadius, 
-                                                droppedCards, 
-                                                MAX_CARDS, 
-                                                droppedGuns, 
-                                                MAX_DROPPED_GUNS);
-                        
+                        // Kill Enemy
+                    PlayerActions_HandleEnemyKilled(&currentLevel, e, &player, droppedMasks, MAX_MASKS, droppedMaskRadius, droppedCards, MAX_CARDS, droppedGuns, MAX_DROPPED_GUNS);
                         bullets[i].active = false;
                         break;
                     }
@@ -667,7 +685,7 @@ static void UpdateGame(float dt) {
                     gameOver = true; 
                     bullets[i].active = false;
                 }
-            }
+    }
         }
     }
 
@@ -676,47 +694,23 @@ static void UpdateGame(float dt) {
         if (droppedMasks[i].active) {
             if (CheckCollisionCircles(player.position, player.radius, droppedMasks[i].position, droppedMasks[i].radius)) {
                 if (IsKeyPressed(KEY_SPACE)) {
-                    // Pickup logic: Find empty slot
-                    int emptyIdx = -1;
-                    for (int s = 0; s < MAX_MASK_SLOTS; s++) {
-                        if (player.inventory.maskSlots[s].type == MASK_NONE) {
-                            emptyIdx = s;
-                            break;
-                        }
-                    }
-
-                    if (emptyIdx != -1) {
-                         // Map dropped identity to mask type
-                         MaskAbilityType mType = MASK_SPEED; 
-                         // Logic to determine type (random or based on enemy?)
-                         if (droppedMasks[i].identity.color.r > 200) mType = MASK_STEALTH; // Red = Stealth?
-                         
-                         player.inventory.maskSlots[emptyIdx].type = mType;
-                         player.inventory.maskSlots[emptyIdx].maxDuration = (mType == MASK_SPEED) ? 10.0f : 5.0f; 
-                         player.inventory.maskSlots[emptyIdx].currentTimer = player.inventory.maskSlots[emptyIdx].maxDuration;
-                         player.inventory.maskSlots[emptyIdx].isActive = false; 
-                         player.inventory.maskSlots[emptyIdx].collected = true;
-                         player.inventory.maskSlots[emptyIdx].color = droppedMasks[i].identity.color;
-                         
-                         droppedMasks[i].active = false;
-                         DrawText("MASK EQUIPPED!", (int)player.position.x - 20, (int)player.position.y - 60, 10, GREEN);
-                    } else {
-                         DrawText("INVENTORY FULL! DROP MASK (G + Num)", (int)player.position.x - 50, (int)player.position.y - 60, 10, RED);
-                    }
+                   // Pickup logic: Put in CURRENT slot
+                    int slot = player.inventory.currentMaskIndex;
+                    // Map dropped identity to mask type/ability
+                    MaskAbilityType mType = MASK_SPEED; 
+                    if (droppedMasks[i].identity.permissionLevel == PERM_ADMIN) mType = MASK_ADMIN;
+                    // Simple mapping for now
+                    
+                    player.inventory.maskSlots[slot].type = mType;
+                    player.inventory.maskSlots[slot].maxDuration = 30.0f; // 30s duration?
+                    player.inventory.maskSlots[slot].currentTimer = 30.0f;
+                    player.inventory.maskSlots[slot].isActive = false; 
+                    player.inventory.maskSlots[slot].collected = true;
+                    player.inventory.maskSlots[slot].color = droppedMasks[i].identity.color;
+                    
+                    droppedMasks[i].active = false;
                 }
             }
-        }
-    }
-    
-    // Drop Mask (Vanish)
-    if (IsKeyPressed(KEY_G)) {
-        // Drops the currently active or selected mask slot
-        int currentMask = player.inventory.currentMaskIndex; // Use selected slot
-        if (player.inventory.maskSlots[currentMask].type != MASK_NONE) {
-             player.inventory.maskSlots[currentMask].type = MASK_NONE;
-             player.inventory.maskSlots[currentMask].isActive = false;
-             player.inventory.maskSlots[currentMask].collected = false;
-             // Vanish - no entity spawned
         }
     }
 
@@ -747,41 +741,50 @@ static void UpdateGame(float dt) {
             if (CheckCollisionCircles(player.position, player.radius, droppedGuns[i].position, droppedGuns[i].radius)) {
                 DrawText("PRESS SPACE TO PICKUP GUN", (int)player.position.x - 50, (int)player.position.y - 40, 10, PINK);
                 if (IsKeyPressed(KEY_SPACE)) {
-                    // Try to find empty slot or a Knife slot to replace (SKIPPING SLOT 0)
+                    // Try to find empty slot
                     int emptySlot = -1;
-                    for (int s=1; s<MAX_GUN_SLOTS; s++) { // Start from 1
-                        if (player.inventory.gunSlots[s].type == GUN_NONE || player.inventory.gunSlots[s].type == GUN_KNIFE) {
+                    for (int s=0; s<MAX_GUN_SLOTS; s++) {
+                        if (player.inventory.gunSlots[s].type == GUN_NONE) {
                             emptySlot = s;
                             break;
                         }
                     }
                     
                     if (emptySlot != -1) {
-                        // Take it (Overwriting Knife/None in slot 1 or 2)
+                        // Take it
                         player.inventory.gunSlots[emptySlot] = droppedGuns[i].gun;
                         player.inventory.currentGunIndex = emptySlot; // Auto-switch?
                         droppedGuns[i].active = false;
                         PlaySound(fxReload); // Sound cue
                     } else {
-                        // Swap with current if current is NOT Slot 0 and NOT a Knife
-                        if (player.inventory.currentGunIndex > 0) {
-                             Gun temp = player.inventory.gunSlots[player.inventory.currentGunIndex];
-                             
-                             if (temp.type != GUN_NONE && temp.type != GUN_KNIFE) {
-                                player.inventory.gunSlots[player.inventory.currentGunIndex] = droppedGuns[i].gun;
-                                
-                                droppedGuns[i].gun = temp; // Swap data
-                                droppedGuns[i].position = player.position; // Move drop to feet
-                             } else {
-                                 // Fallback (Shouldn't happen if emptySlot logic works)
-                                 player.inventory.gunSlots[player.inventory.currentGunIndex] = droppedGuns[i].gun;
-                                 droppedGuns[i].active = false;
-                             }
+                        // Swap with current
+                        Gun temp = player.inventory.gunSlots[player.inventory.currentGunIndex];
+                        
+                        // If current is None/Knife we might not want to swap if we logic'd emptySlot correctly above, 
+                        // but if we are "Full" with legit guns, we swap.
+                        // Wait, if current is Knife, is it a "Gun"? 
+                        // Our types says GUN_KNIFE. We usually don't drop knife.
+                        // So if we have Knife, we should just overwrite it if we treat it as a slot?
+                        // Or if we strictly follow 3 gun slots...
+                        // Let's assume we Swap.
+                        
+                        // We need to drop the current gun at player pos
+                        // But wait, we are inside the droppedGuns loop. 
+                        // We can just transform THIS dropped gun into the one we dropped?
+                        
+                        if (temp.type != GUN_NONE && temp.type != GUN_KNIFE) {
+                            player.inventory.gunSlots[player.inventory.currentGunIndex] = droppedGuns[i].gun;
+                            
+                            droppedGuns[i].gun = temp; // Swap data
+                            droppedGuns[i].position = player.position; // Move drop to feet
+                            // Keep active true
                         } else {
-                             // Holding Knife (Slot 0) and Slots 1/2 are full.
-                             // Show UI "Inventory Full"? Or swap with Slot 1 by default?
-                             // User requirement implies Slot 0 is safe. We just don't pick up.
-                             DrawText("INVENTORY FULL - SWITCH WEAPON TO SWAP", (int)player.position.x - 60, (int)player.position.y - 50, 10, RED);
+                            // If holding Knife, just take logic should have handled it? 
+                            // If slots are full with non-knives, we end up here.
+                            // If we hold Knife and slots are full (e.g. 3 rifles in inventory but holding knife?), 
+                            // we swap into current index?
+                            player.inventory.gunSlots[player.inventory.currentGunIndex] = droppedGuns[i].gun;
+                            droppedGuns[i].active = false; // Just take, don't drop knife
                         }
                     }
                 }
@@ -800,19 +803,16 @@ static void UpdateGame(float dt) {
                 if (!droppedGuns[i].active) {
                     droppedGuns[i].active = true;
                     droppedGuns[i].position = player.position;
-                    // Offset slightly forward
-                    droppedGuns[i].position.x += 20 * player.identity.speed * dt * cosf(player.rotation * DEG2RAD);
+                    // Offset slightly forward?
+                    droppedGuns[i].position.x += 20 * player.identity.speed * dt * cosf(player.rotation * DEG2RAD); // Rough dir
                     droppedGuns[i].position.y += 20 * player.identity.speed * dt * sinf(player.rotation * DEG2RAD);
                     
                     droppedGuns[i].radius = 15.0f;
                     droppedGuns[i].gun = current;
                     
-                    // Revert slot to Knife
-                    player.inventory.gunSlots[idx].type = GUN_KNIFE;
-                    player.inventory.gunSlots[idx].active = true;
-                    player.inventory.gunSlots[idx].damage = 50.0f;
-                    player.inventory.gunSlots[idx].range = 100.0f;
-                    player.inventory.gunSlots[idx].cooldown = 0.5f;
+                    // Remove from inv
+                    player.inventory.gunSlots[idx].type = GUN_NONE;
+                    player.inventory.gunSlots[idx].active = false;
                     
                     break;
                 }
@@ -823,17 +823,25 @@ static void UpdateGame(float dt) {
     // 6. Door Logic
     for (int i = 0; i < currentLevel.doorCount; i++) {
         PermissionLevel myLevel = player.inventory.card.level;
+        // If mask active? 
+        // We need to check if active mask provides permission overrides?
+        // Or just use card level which should be updated if we assume card update logic exists.
+        // Wait, did we implement card update logic? 
+        // Previously card level was static or updated via 'identity'.
+        // Let's assume Mask/Identity swap updates card or we just use `player.identity.permissionLevel` if we were syncing it?
+        // The refactor moved to `player.inventory.card.level`.
+        // Let's rely on that.
         
-        bool sufficientPerm = myLevel >= currentLevel.doors[i].requiredPerm;
+        bool sufficientPerm = myLevel >= currentLevel.doorPerms[i];
         if (developerMode) sufficientPerm = true; 
         
-        if (CheckCollisionCircleRec(player.position, player.radius + 10.0f, currentLevel.doors[i].rect) && sufficientPerm) {
-            currentLevel.doors[i].isOpen = true;
+        if (CheckCollisionCircleRec(player.position, player.radius + 10.0f, currentLevel.doors[i]) && sufficientPerm) {
+            currentLevel.doorsOpen[i] = true;
         } else {
             // Only close if player is far enough? Or auto close.
             // Simple auto - check if player is NOT in it.
-            if (!CheckCollisionCircleRec(player.position, player.radius + 5.0f, currentLevel.doors[i].rect)) {
-                 currentLevel.doors[i].isOpen = false;
+            if (!CheckCollisionCircleRec(player.position, player.radius + 5.0f, currentLevel.doors[i])) {
+                 currentLevel.doorsOpen[i] = false;
             }
         }
     }
@@ -851,280 +859,116 @@ static void DrawGame(void) {
     ClearBackground((Color){20, 20, 25, 255});
 
     if (gameOver || gameWon) {
-        int sw = GetScreenWidth();
-        int sh = GetScreenHeight();
-
+        int sw = GetScreenWidth(); int sh = GetScreenHeight();
         if (gameOver) {
-            DrawText("GAME OVER", sw / 2 - 100, sh / 2 - 20, 40, RED);
-            DrawText("Press R to Restart Level", sw / 2 - 100, sh / 2 + 30, 20, RAYWHITE);
-            DrawText("Press M to Menu", sw / 2 - 100, sh / 2 + 60, 20, RAYWHITE);
+            DrawText("GAME OVER", sw/2 - 100, sh/2 - 20, 40, RED);
+            DrawText("Press R to Restart", sw/2 - 100, sh/2 + 30, 20, RAYWHITE);
         } else {
-            DrawText("EPISODE COMPLETE!", sw / 2 - 150, sh / 2 - 20, 40, GOLD);
-            // Player builds: Next + Menu.
-#if !defined(DEV_MODE) || !(DEV_MODE)
-            DrawText("Press N to Next", sw / 2 - 100, sh / 2 + 30, 20, RAYWHITE);
-            DrawText("Press M to Menu", sw / 2 - 100, sh / 2 + 60, 20, RAYWHITE);
-            DrawText("(Saving will be added later)", sw / 2 - 130, sh / 2 + 90, 18, Fade(RAYWHITE, 0.7f));
-#else
-            // Dev builds: Replay still useful.
-            DrawText("Press R to Replay", sw / 2 - 100, sh / 2 + 30, 20, RAYWHITE);
-            DrawText("Press N to Next", sw / 2 - 100, sh / 2 + 60, 20, RAYWHITE);
-            DrawText("Press M to Menu", sw / 2 - 100, sh / 2 + 90, 20, RAYWHITE);
-#endif
+            DrawText("EPISODE COMPLETE!", sw/2 - 150, sh/2 - 20, 40, GOLD);
+            DrawText("Press N for Next Episode", sw/2 - 100, sh/2 + 30, 20, RAYWHITE);
         }
     } else {
         BeginMode2D(camera);
 
-        for (int i = 0; i < currentLevel.bgs_count; i++) {
-            Background* bg = &currentLevel.bgs[i];
-            DrawTexturePro(bg->texture, bg->source, bg->dest, (Vector2){0,0}, 0.f, WHITE);
+        if (currentLevel.id == 0 && texEpilogMap.id != 0) {
+            DrawTextureEx(texEpilogMap, (Vector2){0, 0}, 0.0f, EPILOG_WORLD_SCALE, WHITE);
         }
 
-        // Draw Level Elements
+        // Epilog NPCs
+        if (currentLevel.id == 0) {
+            for (int i = 0; i < currentLevel.enemyCount; i++) {
+                Entity *e = &currentLevel.enemies[i];
+                if (!e->active || e->isEnemy || !e->isInteractive || e->state != STATE_IDLE) continue;
+                if (e->npcType == NPC_KIZ && animPlayerKizInit) DrawAnimPlayer(&animPlayerKiz, e->position, EPILOG_NPC_SCALE, WHITE);
+                if (e->npcType == NPC_SIGARACI && animPlayerSigaraciInit) DrawAnimPlayer(&animPlayerSigaraci, e->position, EPILOG_NPC_SCALE, WHITE);
+                if (e->npcType == NPC_BALIKCI && animPlayerBalikciInit) DrawAnimPlayer(&animPlayerBalikci, e->position, EPILOG_NPC_SCALE, WHITE);
+            }
+        }
+
+        // Zone backgrounds for Episode 1+
+        if (currentLevel.id != 0) {
+            DrawTexturePro(texZone1, (Rectangle){0,0,texZone1.width,texZone1.height}, (Rectangle){0,0,913,642}, (Vector2){0,0}, 0.f, WHITE);
+            DrawTexturePro(texZone2, (Rectangle){0,0,texZone2.width,texZone2.height}, (Rectangle){913,0,911,661}, (Vector2){0,0}, 0.f, WHITE);
+            DrawTexturePro(texZone3, (Rectangle){0,0,texZone3.width,texZone3.height}, (Rectangle){1824,0,957,654}, (Vector2){0,0}, 0.f, WHITE);
+            DrawTexturePro(texZone4, (Rectangle){0,0,texZone4.width,texZone4.height}, (Rectangle){1824,654,869,645}, (Vector2){0,0}, 0.f, WHITE);
+            DrawTexturePro(texZone5, (Rectangle){0,0,texZone5.width,texZone5.height}, (Rectangle){957,654,867,649}, (Vector2){0,0}, 0.f, WHITE);
+            DrawTexturePro(texZone6, (Rectangle){0,0,texZone6.width,texZone6.height}, (Rectangle){162,654,795,853}, (Vector2){0,0}, 0.f, WHITE);
+            DrawTexturePro(texZone7, (Rectangle){0,0,texZone7.width,texZone7.height}, (Rectangle){162,1507,795,805}, (Vector2){0,0}, 0.f, WHITE);
+        }
+
         if (playerDebugDraw) {
             for (int i = 0; i < currentLevel.wallCount; i++) DrawRectangleRec(currentLevel.walls[i], Fade(RED, 0.5f));
         }
-        for (int i = 0; i < currentLevel.doorCount; i++) {
-            Color doorColor = SKYBLUE;
-            if (currentLevel.doors[i].requiredPerm == PERM_STAFF) doorColor = GREEN;
-            else if (currentLevel.doors[i].requiredPerm == PERM_GUARD) doorColor = RED;
-            else if (currentLevel.doors[i].requiredPerm == PERM_ADMIN) doorColor = PURPLE;
 
-            if (!currentLevel.doors[i].isOpen) {
-                DrawRectangleRec(currentLevel.doors[i].rect, Fade(doorColor, 0.6f));
-                DrawRectangleLinesEx(currentLevel.doors[i].rect, 2.0f, WHITE);
-                
-                // Draw a small lock icon visual (circle)
-                Vector2 center = { currentLevel.doors[i].rect.x + currentLevel.doors[i].rect.width/2, 
-                                   currentLevel.doors[i].rect.y + currentLevel.doors[i].rect.height/2 };
-                DrawCircleV(center, 4.0f, WHITE);
+        for (int i = 0; i < currentLevel.doorCount; i++) {
+            Color doorColor = currentLevel.doorPerms[i] == PERM_STAFF ? GREEN : (currentLevel.doorPerms[i] == PERM_GUARD ? RED : SKYBLUE);
+            if (!currentLevel.doorsOpen[i]) {
+                DrawRectangleRec(currentLevel.doors[i], Fade(doorColor, 0.6f));
+                DrawRectangleLinesEx(currentLevel.doors[i], 2.0f, WHITE);
             } else {
-                DrawRectangleLinesEx(currentLevel.doors[i].rect, 3.0f, Fade(doorColor, 0.5f));
+                DrawRectangleLinesEx(currentLevel.doors[i], 3.0f, Fade(doorColor, 0.5f));
             }
         }
 
-
-        if (currentLevel.id == 1) {
-             DrawText("ZONE 1: STAFF ONLY", 400, 300, 30, Fade(WHITE, 0.1f));
-             // Animated "EXIT" Text
-             float time = (float)GetTime();
-             float rotation = sinf(time * 2.0f) * 10.0f; // Rock back and forth +/- 10 degrees
-             float scale = 1.0f + sinf(time * 5.0f) * 0.1f; // Pulse scale
-             
-             // Burning/Flashing Color
-             Color c1 = ORANGE;
-             Color c2 = RED;
-             float t = (sinf(time * 8.0f) + 1.0f) / 2.0f;
-             Color burnColor = (Color){
-                (unsigned char)(c1.r + t*(c2.r - c1.r)),
-                (unsigned char)(c1.g + t*(c2.g - c1.g)),
-                (unsigned char)(c1.b + t*(c2.b - c1.b)),
-                255
-             };
-
-             Vector2 textSize = MeasureTextEx(GetFontDefault(), "EXIT", 40, 4);
-             Vector2 origin = { textSize.x / 2, textSize.y / 2 };
-             DrawTextPro(GetFontDefault(), "EXIT", (Vector2){480 + origin.x, 2340 + origin.y}, origin, rotation, 40 * scale, 4, burnColor);
-        }
-
-        // Enemies
         for (int i = 0; i < currentLevel.enemyCount; i++) {
-            if (currentLevel.enemies[i].active) {
-                // Draw Vision Cone
-                float halfAngle = currentLevel.enemies[i].sightAngle / 2.0f;
-                Vector2 origin = currentLevel.enemies[i].position;
-                float startAngle = currentLevel.enemies[i].rotation - halfAngle;
-                float endAngle = currentLevel.enemies[i].rotation + halfAngle;
-                int segments = 30; 
-                float step = (endAngle - startAngle) / segments;
-                
-                rlSetTexture(0);
-                rlDisableBackfaceCulling(); // Ensure we see it regardless of winding
-                rlBegin(RL_TRIANGLES);
-                rlColor4ub(200, 200, 200, 60); // Light Gray, Semi-transparent
+            Entity *e = &currentLevel.enemies[i];
+            if (!e->active) continue;
+            if (currentLevel.id == 0 && !e->isEnemy && e->isInteractive) continue;
 
+            if (e->isEnemy) {
+                float halfAngle = e->sightAngle / 2.0f;
+                Vector2 origin = e->position;
+                float startAngle = e->rotation - halfAngle;
+                float endAngle = e->rotation + halfAngle;
+                int segments = 30;
+                float step = (endAngle - startAngle) / segments;
+                rlSetTexture(0); rlBegin(RL_TRIANGLES); rlColor4ub(200, 200, 200, 60);
                 for (int s = 0; s < segments; s++) {
                     float a1 = (startAngle + s * step) * DEG2RAD;
                     float a2 = (startAngle + (s + 1) * step) * DEG2RAD;
-
-                    Vector2 d1 = { cosf(a1) * currentLevel.enemies[i].sightRange, sinf(a1) * currentLevel.enemies[i].sightRange };
-                    Vector2 d2 = { cosf(a2) * currentLevel.enemies[i].sightRange, sinf(a2) * currentLevel.enemies[i].sightRange };
-
-                    Vector2 p1 = Vector2Add(origin, d1);
-                    Vector2 p2 = Vector2Add(origin, d2);
-                    
-                    // Raycast against walls
+                    Vector2 p1 = Vector2Add(origin, (Vector2){ cosf(a1)*e->sightRange, sinf(a1)*e->sightRange });
+                    Vector2 p2 = Vector2Add(origin, (Vector2){ cosf(a2)*e->sightRange, sinf(a2)*e->sightRange });
                     p1 = Gameplay_GetRayHit(origin, p1, &currentLevel);
                     p2 = Gameplay_GetRayHit(origin, p2, &currentLevel);
-
-                    // Draw Triangle (Origin -> P1 -> P2)
-                    rlVertex2f(origin.x, origin.y);
-                    rlVertex2f(p1.x, p1.y);
-                    rlVertex2f(p2.x, p2.y);
-                    
-                    // Draw Backface just in case
-                    rlVertex2f(origin.x, origin.y);
-                    rlVertex2f(p2.x, p2.y);
-                    rlVertex2f(p1.x, p1.y);
+                    rlVertex2f(origin.x, origin.y); rlVertex2f(p1.x, p1.y); rlVertex2f(p2.x, p2.y);
                 }
                 rlEnd();
-                rlEnableBackfaceCulling(); // Reset default (though usually off in 2D)
-
-                DrawCircleV(currentLevel.enemies[i].position, currentLevel.enemies[i].radius, currentLevel.enemies[i].identity.color);
-                DrawCircleLines((int)currentLevel.enemies[i].position.x, (int)currentLevel.enemies[i].position.y, currentLevel.enemies[i].radius + 2, WHITE);
-                
-                // HP Bar
-                float hpRatio = currentLevel.enemies[i].health / currentLevel.enemies[i].maxHealth;
-                if (hpRatio < 0.0f) hpRatio = 0.0f;
-                int barW = 40;
-                int barH = 5;
-                int barX = (int)currentLevel.enemies[i].position.x - barW/2;
-                int barY = (int)currentLevel.enemies[i].position.y - 30;
-                
-                DrawRectangle(barX, barY, barW, barH, RED);
-                DrawRectangle(barX, barY, (int)(barW * hpRatio), barH, GREEN);
-                DrawRectangleLines(barX, barY, barW, barH, BLACK);
-                
-                // Text
-                DrawText(TextFormat("%.0f", currentLevel.enemies[i].health), barX, barY - 10, 10, WHITE);
             }
+
+            DrawCircleV(e->position, e->radius, e->identity.color);
+            DrawCircleLines((int)e->position.x, (int)e->position.y, e->radius + 2, WHITE);
         }
 
-        // Mask
-        for (int i = 0; i < MAX_MASKS; i++) {
-            if (droppedMasks[i].active) {
-                // Draw Striped Pattern
-                Vector2 pos = droppedMasks[i].position;
-                float r = droppedMasks[i].radius;
-                Color col = droppedMasks[i].identity.color;
-                
-                DrawCircleV(pos, r, col);
-                DrawCircleLines((int)pos.x, (int)pos.y, r, WHITE);
-                
-                // Stripes (Diagonal)
-                rlPushMatrix();
-                rlTranslatef(pos.x, pos.y, 0);
-                rlRotatef(45.0f, 0, 0, 1);
-                DrawRectangle(-r, -r/2, r*2, 4, WHITE);
-                DrawRectangle(-r, 0, r*2, 4, WHITE);
-                DrawRectangle(-r, r/2, r*2, 4, WHITE);
-                rlPopMatrix();
-
-                DrawText("MASK", (int)pos.x - 10, (int)pos.y - 10, 8, BLACK);
-                DrawText("PRESS SPACE", (int)pos.x - 30, (int)pos.y - 30, 10, WHITE);
-            }
+        for (int i = 0; i < MAX_MASKS; i++) if (droppedMasks[i].active) {
+            DrawCircleV(droppedMasks[i].position, 10, droppedMasks[i].identity.color);
+            DrawText("MASK", (int)droppedMasks[i].position.x - 10, (int)droppedMasks[i].position.y - 10, 8, WHITE);
         }
-
-        // Cards
-        for (int i = 0; i < MAX_CARDS; i++) {
-            if (droppedCards[i].active) {
-                // Draw a rectangle card
-                Rectangle cardRect = { droppedCards[i].position.x - 8, droppedCards[i].position.y - 5, 16, 10 };
-                DrawRectangleRec(cardRect, droppedCards[i].identity.color);
-                DrawRectangleLinesEx(cardRect, 1, WHITE);
-                DrawText("CARD", (int)droppedCards[i].position.x - 10, (int)droppedCards[i].position.y - 15, 8, WHITE);
-            }
+        for (int i = 0; i < MAX_CARDS; i++) if (droppedCards[i].active) {
+            Rectangle cardRect = { droppedCards[i].position.x - 8, droppedCards[i].position.y - 5, 16, 10 };
+            DrawRectangleRec(cardRect, droppedCards[i].identity.color);
+            DrawRectangleLinesEx(cardRect, 1, WHITE);
         }
-
-        // Dropped Guns
-        for (int i = 0; i < MAX_DROPPED_GUNS; i++) {
-            if (droppedGuns[i].active) {
-                // Determine text/color
-                Color gunCol = ORANGE;
-                const char* txt = "GUN";
-                if (droppedGuns[i].gun.type == GUN_HANDGUN) { txt = "Pistol"; gunCol = GOLD; }
-                else if (droppedGuns[i].gun.type == GUN_RIFLE) { txt = "Rifle"; gunCol = LIME; }
-                
-                DrawCircleV(droppedGuns[i].position, droppedGuns[i].radius, gunCol);
-                DrawText(txt, (int)droppedGuns[i].position.x - 20, (int)droppedGuns[i].position.y - 20, 10, WHITE);
-            }
+        for (int i = 0; i < MAX_DROPPED_GUNS; i++) if (droppedGuns[i].active) {
+            DrawCircleV(droppedGuns[i].position, 15, ORANGE);
+            DrawText("GUN", (int)droppedGuns[i].position.x - 10, (int)droppedGuns[i].position.y - 10, 10, WHITE);
         }
+        for (int i = 0; i < MAX_BULLETS; i++) if (bullets[i].active) DrawCircleV(bullets[i].position, BULLET_RADIUS, bullets[i].isPlayerOwned ? YELLOW : ORANGE);
 
-        // Bullets
-        for (int i = 0; i < MAX_BULLETS; i++) {
-            if (bullets[i].active) DrawCircleV(bullets[i].position, bullets[i].radius, bullets[i].isPlayerOwned ? YELLOW : ORANGE);
-        }
-
-        // Player
         if (playerRender.loaded) {
             PlayerRender_Draw(&playerRender, &player, lastEquipmentState);
             PlayerRender_DrawMuzzleFlash(&playerRender, &player, lastEquipmentState, weaponShootTimer);
-        } else {
-            PlayerRender_DrawFallback(player.position, player.radius); // Fallback if not loaded
         }
+        if (meleeTargetIndex != -1) DrawText("PRESS E TO CHOKE", (int)player.position.x, (int)player.position.y - 60, 12, WHITE);
+        if (npcPromptIndex != -1) DrawText("PRESS E", (int)(currentLevel.enemies[npcPromptIndex].position.x - 25), (int)(currentLevel.enemies[npcPromptIndex].position.y - 30), 12, WHITE);
 
-        // Melee Prompt
-        if (meleeTargetIndex >= 0 && meleeTargetIndex < currentLevel.enemyCount && currentLevel.enemies[meleeTargetIndex].active) {
-             DrawText("HOLD E TO CHOKE", (int)player.position.x - 40, (int)player.position.y - 60, 12, RED);
-        }
-
-        // Choking UI
-        if (player.isChoking) {
-             Vector2 center = player.position;
-             float radius = 45.0f; 
-             float progress = player.chokeTimer / 1.0f; 
-             
-             // Background
-             DrawCircleLines((int)center.x, (int)center.y, radius, Fade(DARKGRAY, 0.8f));
-             
-             // Progress
-             DrawCircleSector(center, radius, 0, 360 * progress, 36, Fade(RED, 0.7f));
-             
-             // Ring
-             // DrawRing(center, innerRadius, outerRadius, startAngle, endAngle, segments, color);
-             // DrawRing(center, innerRadius, outerRadius, startAngle, endAngle, segments, color);
-             DrawRing(center, radius - 2, radius + 2, 0, 360 * progress, 36, RED);
-
-             DrawText("CHOKING...", (int)center.x - 30, (int)center.y - 80, 10, RED);
-        }
-        
-        // Debug
-        if (playerDebugDraw) {
-             DrawCircleLines((int)player.position.x, (int)player.position.y, player.radius, GOLD);
-        }
-        
         EndMode2D();
-    // HUD
+    }
+
     Hud_DrawPlayer(&player);
-
-    // UI: Active Mask Info
-    int activeMaskIdx = -1;
-    for(int i=0; i<3; i++) {
-        if(player.inventory.maskSlots[i].isActive) {
-             activeMaskIdx = i;
-             break;
-        }
-    }
-    
-    if (activeMaskIdx != -1) {
-        Mask m = player.inventory.maskSlots[activeMaskIdx];
-        const char *maskName = (m.type == MASK_SPEED) ? "Speed Mask" : (m.type == MASK_STEALTH ? "Stealth Mask" : "Unknown Mask");
-        const char *desc = (m.type == MASK_SPEED) ? "Ability: +50% Speed (10s)" : (m.type == MASK_STEALTH ? "Ability: Invisibility (5s)" : "Ability: None");
-        
-        DrawText(TextFormat("ACTIVE: %s (%.1fs)", maskName, m.currentTimer), GetScreenWidth()/2 - 150, 50, 24, GREEN);
-        DrawText(desc, GetScreenWidth()/2 - 150, 80, 20, WHITE);
-    } else {
-        // Show selected slot info if valid
-        Mask m = player.inventory.maskSlots[player.inventory.currentMaskIndex];
-        if (m.type != MASK_NONE) {
-             const char *maskName = (m.type == MASK_SPEED) ? "Speed Mask" : (m.type == MASK_STEALTH ? "Stealth Mask" : "Unknown Mask");
-             DrawText(TextFormat("SELECTED: %s [PRESS P TO ACTIVATE]", maskName), GetScreenWidth()/2 - 200, 50, 20, YELLOW);
-        }
-    }
-
-    if (levelStartTimer > 0) {
-        DrawText("READY...", GetScreenWidth()/2 - 50, GetScreenHeight()/2, 30, RED);
-    }
-    
-    if (developerMode) {
-        DrawText("DEV MODE ON (F) - GOD & UNLOCK", 10, 10, 20, GREEN);
-    }
-    }
-
-	level_editor_draw(&editor, camera);
+    if (currentLevel.id == 0) DrawText(TextFormat("KIZ: %d, SIG: %d, BAL: %d", animPlayerKiz.frame_index, animPlayerSigaraci.frame_index, animPlayerBalikci.frame_index), 10, 40, 18, RAYWHITE);
+    if (levelStartTimer > 0) DrawText("READY...", GetScreenWidth()/2 - 50, GetScreenHeight()/2, 30, RED);
     EndDrawing();
 }
-
 
 bool Game_Update(void) {
     if (currentState == STATE_MENU) {
@@ -1143,7 +987,30 @@ void Game_Draw(void) {
     }
 }
 
-
 void Game_Shutdown(void) {
-}
+    UnloadTexture(texZone1);
+    UnloadTexture(texZone2);
+    UnloadTexture(texZone3);
+    UnloadTexture(texZone4);
+    UnloadTexture(texZone5);
+    UnloadTexture(texZone6);
+    UnloadTexture(texZone7);
+    if (texEpilogMap.id != 0) UnloadTexture(texEpilogMap);
+    if (animKizIdleLoaded) {
+        UnloadAnimClip(&animKizIdle);
+        animKizIdleLoaded = false;
+    }
+    animPlayerKizInit = false;
 
+    if (animSigaraciIdleLoaded) {
+        UnloadAnimClip(&animSigaraciIdle);
+        animSigaraciIdleLoaded = false;
+    }
+    animPlayerSigaraciInit = false;
+
+    if (animBalikciIdleLoaded) {
+        UnloadAnimClip(&animBalikciIdle);
+        animBalikciIdleLoaded = false;
+    }
+    animPlayerBalikciInit = false;
+}

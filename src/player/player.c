@@ -1,6 +1,5 @@
 #include "player.h"
 #include "../../raylib/src/raymath.h"
-#include "../masks/mask.h"
 
 Entity InitPlayer(Vector2 spawnPos, Identity startIdentity) {
   Entity player = {0};
@@ -10,23 +9,18 @@ Entity InitPlayer(Vector2 spawnPos, Identity startIdentity) {
   player.isPlayer = true;
   player.radius = 20.0f;
   player.shootTimer = 0.0f;
-  player.shootTimer = 0.0f;
-  
-  // STATS
-  player.health = 100.0f;
-  player.maxHealth = 100.0f;
-  player.speedMultiplier = 1.0f;
-  player.isInvisible = false;
   
   // INIT INVENTORY
-  // All 3 Slots start with Knife
-  for(int i=0; i<3; i++) {
-       player.inventory.gunSlots[i].type = GUN_KNIFE;
-       player.inventory.gunSlots[i].active = true;
-       player.inventory.gunSlots[i].damage = 50.0f;
-       player.inventory.gunSlots[i].range = 100.0f;
-       player.inventory.gunSlots[i].cooldown = 0.5f;
-  }
+  // Slot 0: Knife
+  player.inventory.gunSlots[0].type = GUN_KNIFE;
+  player.inventory.gunSlots[0].active = true;
+  player.inventory.gunSlots[0].damage = 10.0f;
+  player.inventory.gunSlots[0].range = 80.0f;
+  player.inventory.gunSlots[0].cooldown = 0.5f;
+
+  // Empty other slots
+  player.inventory.gunSlots[1].type = GUN_NONE;
+  player.inventory.gunSlots[2].type = GUN_NONE;
   player.inventory.currentGunIndex = 0;
 
   // Empty masks
@@ -41,24 +35,22 @@ Entity InitPlayer(Vector2 spawnPos, Identity startIdentity) {
 }
 
 void UpdatePlayer(Entity *player, Level *currentLevel, float dt, bool godMode) {
-  // Update Masks
-  Masks_Update(player, dt);
-
   Vector2 moveInput = {0};
-  
-  if (!player->isChoking) {
-      if (IsKeyDown(KEY_W)) moveInput.y -= 1.0f;
-      if (IsKeyDown(KEY_S)) moveInput.y += 1.0f;
-      if (IsKeyDown(KEY_A)) moveInput.x -= 1.0f;
-      if (IsKeyDown(KEY_D)) moveInput.x += 1.0f;
-  }
+  if (IsKeyDown(KEY_W))
+    moveInput.y -= 1.0f;
+  if (IsKeyDown(KEY_S))
+    moveInput.y += 1.0f;
+  if (IsKeyDown(KEY_A))
+    moveInput.x -= 1.0f;
+  if (IsKeyDown(KEY_D))
+    moveInput.x += 1.0f;
 
   player->velocity = (Vector2){0};
 
   if (Vector2Length(moveInput) > 0) {
     moveInput = Vector2Normalize(moveInput);
 
-    Vector2 delta = Vector2Scale(moveInput, player->identity.speed * player->speedMultiplier * dt);
+    Vector2 delta = Vector2Scale(moveInput, player->identity.speed * dt);
     Vector2 newPos = player->position;
 
     // --- X AXIS ---
@@ -77,8 +69,8 @@ void UpdatePlayer(Entity *player, Level *currentLevel, float dt, bool godMode) {
     if (!godMode) {
         PermissionLevel myLevel = player->inventory.card.level;
         for (int i = 0; i < currentLevel->doorCount && !blocked_x; i++) {
-          if (CheckCollisionCircleRec(xPos, player->radius, currentLevel->doors[i].rect)) {
-            if (myLevel < currentLevel->doors[i].requiredPerm) {
+          if (CheckCollisionCircleRec(xPos, player->radius, currentLevel->doors[i])) {
+            if (myLevel < currentLevel->doorPerms[i]) {
               blocked_x = true;
             }
           }
@@ -114,8 +106,8 @@ void UpdatePlayer(Entity *player, Level *currentLevel, float dt, bool godMode) {
     if (!godMode) {
         PermissionLevel myLevel = player->inventory.card.level;
         for (int i = 0; i < currentLevel->doorCount && !blocked_y; i++) {
-          if (CheckCollisionCircleRec(yPos, player->radius, currentLevel->doors[i].rect)) {
-            if (myLevel < currentLevel->doors[i].requiredPerm) {
+          if (CheckCollisionCircleRec(yPos, player->radius, currentLevel->doors[i])) {
+            if (myLevel < currentLevel->doorPerms[i]) {
               blocked_y = true;
             }
           }

@@ -8,12 +8,11 @@ Entity InitEnemy(Vector2 position, EnemyType type) {
     enemy.position = position;
     enemy.active = true;
     enemy.isPlayer = false;
+    enemy.isEnemy = true;
+    enemy.isInteractive = false;
+    enemy.npcType = NPC_NONE;
     enemy.radius = 20.0f;
     enemy.shootTimer = ENEMY_SHOOT_INTERVAL;
-    enemy.health = 100.0f;
-    enemy.health = 100.0f;
-    enemy.maxHealth = 100.0f;
-    enemy.IGotHitImSearchingThePlayerForHowManySeconds = 5.0f; // Default duration
 
     switch (type) {
         case ENEMY_CIVILIAN:
@@ -71,4 +70,3 @@ Identity GetIdentity(EnemyType type) {
             return (Identity){0};
     }
 }
-

@@ -2,14 +2,6 @@
 #include "../types.h"
 #include "episodes.h"
 
-static Texture2D texZone1;
-static Texture2D texZone2;
-static Texture2D texZone3;
-static Texture2D texZone4;
-static Texture2D texZone5;
-static Texture2D texZone6;
-static Texture2D texZone7;
-
 
 // Define constants locally if needed, or share via header.
 // For now, hardcoded values from main.c are fine or we can redefine macros.
@@ -152,91 +144,58 @@ void InitEpisode1(Level *level) {
   // --- Doors ---
   level->doorCount = 6;
   // D1 (X=913)
-  level->doors[0].rect = (Rectangle){913, 260, 20, 120};
-  level->doors[0].requiredPerm = PERM_STAFF;
+  level->doors[0] = (Rectangle){913, 260, 20, 120};
+  level->doorPerms[0] = PERM_STAFF;
 
   // D2 (X=1824)
-  level->doors[1].rect = (Rectangle){1824, 260, 20, 120};
-  level->doors[1].requiredPerm = PERM_GUARD;
+  level->doors[1] = (Rectangle){1824, 260, 20, 120};
+  level->doorPerms[1] = PERM_GUARD;
 
   // D3 (Z3->Z4, Y=654)
-  level->doors[2].rect = (Rectangle){2124, 654, 120, 20};
-  level->doors[2].requiredPerm = PERM_ADMIN;
+  level->doors[2] = (Rectangle){2124, 654, 120, 20};
+  level->doorPerms[2] = PERM_ADMIN;
 
   // D4 (Z4->Z5, X=1824)
-  level->doors[3].rect = (Rectangle){1824, 914, 20, 120};
-  level->doors[3].requiredPerm = PERM_GUARD;
+  level->doors[3] = (Rectangle){1824, 914, 20, 120};
+  level->doorPerms[3] = PERM_GUARD;
 
   // D5 (Z5->Z6, X=957)
-  level->doors[4].rect = (Rectangle){957, 914, 20, 120};
-  level->doors[4].requiredPerm = PERM_STAFF;
+  level->doors[4] = (Rectangle){957, 914, 20, 120};
+  level->doorPerms[4] = PERM_STAFF;
 
   // D6 (Z6->Z7, Y=1507)
-  level->doors[5].rect = (Rectangle){462, 1507, 120, 20};
-  level->doors[5].requiredPerm = PERM_ADMIN;
+  level->doors[5] = (Rectangle){462, 1507, 120, 20};
+  level->doorPerms[5] = PERM_ADMIN;
   
-  for(int i=0; i<6; i++) level->doors[i].isOpen = false;
+  for(int i=0; i<6; i++) level->doorsOpen[i] = false;
 
   // --- Enemies (Unique Keys) ---
   level->enemyCount = 7;
-  
   // Z1 (450, 320) - Key Z1 (Staff) -> Walker
-  level->enemies[0] = InitEnemy((Vector2){450, 320}, ENEMY_STAFF); // Base properties
-  level->enemies[0].identity = idKeyZ1; // Override identity if needed
-  level->enemies[0].haveMask = true;    // Has Mask
+  level->enemies[0] = (Entity){.position={450, 320}, .active=true, .isPlayer=false, .isEnemy=true, .isInteractive=false, .npcType=NPC_NONE, .radius=20, .identity=idKeyZ1, 
+                              .shootTimer=ENEMY_SHOOT_INTERVAL, .aiType=AI_WALKER, .sightRange=1400.0f, .sightAngle=120.0f, .rotation=(float)GetRandomValue(0,360)};
   
   // Z2 (1350, 320) - Key Z2 (Guard) -> Guardian
-  level->enemies[1] = InitEnemy((Vector2){1350, 320}, ENEMY_GUARD);
-  level->enemies[1].identity = idKeyZ2;
-  level->enemies[1].haveMask = false;   // No Mask
+  level->enemies[1] = (Entity){.position={1350, 320}, .active=true, .isPlayer=false, .isEnemy=true, .isInteractive=false, .npcType=NPC_NONE, .radius=20, .identity=idKeyZ2, 
+                              .shootTimer=ENEMY_SHOOT_INTERVAL, .aiType=AI_GUARDIAN, .sightRange=1600.0f, .sightAngle=120.0f, .rotation=(float)GetRandomValue(0,360)};
   
   // Z3 (2250, 320) - Key Z3 (Admin) -> Guardian
-  level->enemies[2] = InitEnemy((Vector2){2250, 320}, ENEMY_ADMIN);
-  level->enemies[2].identity = idKeyZ3;
+  level->enemies[2] = (Entity){.position={2250, 320}, .active=true, .isPlayer=false, .isEnemy=true, .isInteractive=false, .npcType=NPC_NONE, .radius=20, .identity=idKeyZ3, 
+                              .shootTimer=ENEMY_SHOOT_INTERVAL, .aiType=AI_GUARDIAN, .sightRange=1600.0f, .sightAngle=120.0f, .rotation=(float)GetRandomValue(0,360)};
   
   // Z4 (2250, 970) - Key Z4 (Guard) -> Guardian
-  level->enemies[3] = InitEnemy((Vector2){2250, 970}, ENEMY_GUARD);
-  level->enemies[3].identity = idKeyZ4;
+  level->enemies[3] = (Entity){.position={2250, 970}, .active=true, .isPlayer=false, .isEnemy=true, .isInteractive=false, .npcType=NPC_NONE, .radius=20, .identity=idKeyZ4, 
+                              .shootTimer=ENEMY_SHOOT_INTERVAL, .aiType=AI_GUARDIAN, .sightRange=1600.0f, .sightAngle=120.0f, .rotation=(float)GetRandomValue(0,360)};
   
   // Z5 (1350, 970) - Key Z5 (Staff) -> Walker
-  level->enemies[4] = InitEnemy((Vector2){1350, 970}, ENEMY_STAFF);
-  level->enemies[4].identity = idKeyZ5;
+  level->enemies[4] = (Entity){.position={1350, 970}, .active=true, .isPlayer=false, .isEnemy=true, .isInteractive=false, .npcType=NPC_NONE, .radius=20, .identity=idKeyZ5, 
+                              .shootTimer=ENEMY_SHOOT_INTERVAL, .aiType=AI_WALKER, .sightRange=1400.0f, .sightAngle=120.0f, .rotation=(float)GetRandomValue(0,360)};
   
   // Z6 (500, 970) - Key Z6 (Admin) -> Guardian
-  level->enemies[5] = InitEnemy((Vector2){500, 970}, ENEMY_ADMIN);
-  level->enemies[5].identity = idKeyZ6;
+  level->enemies[5] = (Entity){.position={500, 970}, .active=true, .isPlayer=false, .isEnemy=true, .isInteractive=false, .npcType=NPC_NONE, .radius=20, .identity=idKeyZ6, 
+                              .shootTimer=ENEMY_SHOOT_INTERVAL, .aiType=AI_GUARDIAN, .sightRange=1600.0f, .sightAngle=120.0f, .rotation=(float)GetRandomValue(0,360)};
   
   // Z7 (500, 1900) - Final Guard -> Guardian
-  level->enemies[6] = InitEnemy((Vector2){500, 1900}, ENEMY_ADMIN);
-  level->enemies[6].identity = idKeyZ3;
-
-
-
-    // Load Textures
-    if (texZone1.id == 0)texZone1 = LoadTexture("assets/environment/background_1.png");
-    if (texZone2.id == 0)texZone2 = LoadTexture("assets/environment/background_2.png");
-    if (texZone3.id == 0)texZone3 = LoadTexture("assets/environment/background_3.png");
-    if (texZone4.id == 0)texZone4 = LoadTexture("assets/environment/background_4.png");
-    if (texZone5.id == 0)texZone5 = LoadTexture("assets/environment/background_5.png");
-    if (texZone6.id == 0)texZone6 = LoadTexture("assets/environment/background_6.png");
-    if (texZone7.id == 0)texZone7 = LoadTexture("assets/environment/background_7.png");
-
-    level->bgs[0] = (Background){texZone1, (Rectangle){0,0,texZone1.width,texZone1.height}, (Rectangle){0,0,913,642}};
-    level->bgs[2] = (Background){texZone2, (Rectangle){0,0,texZone2.width,texZone2.height}, (Rectangle){913,0,911,661}};
-    level->bgs[3] = (Background){texZone3, (Rectangle){0,0,texZone3.width,texZone3.height}, (Rectangle){1824,0,957,654}};
-    level->bgs[4] = (Background){texZone4, (Rectangle){0,0,texZone4.width,texZone4.height}, (Rectangle){1824,654,869,645}};
-    level->bgs[5] = (Background){texZone5, (Rectangle){0,0,texZone5.width,texZone5.height}, (Rectangle){957,654,867,649}};
-    level->bgs[6] = (Background){texZone6, (Rectangle){0,0,texZone6.width,texZone6.height}, (Rectangle){162,654,795,853}};
-    level->bgs[7] = (Background){texZone7, (Rectangle){0,0,texZone7.width,texZone7.height}, (Rectangle){162,1507,795,805}};
-	level->bgs_count = 8;
-}
-
-void UnloadEpisode1() {
-    UnloadTexture(texZone1);
-    UnloadTexture(texZone2);
-    UnloadTexture(texZone3);
-    UnloadTexture(texZone4);
-    UnloadTexture(texZone5);
-    UnloadTexture(texZone6);
-    UnloadTexture(texZone7);
+  level->enemies[6] = (Entity){.position={500, 1900}, .active=true, .isPlayer=false, .isEnemy=true, .isInteractive=false, .npcType=NPC_NONE, .radius=20, .identity=idKeyZ3, 
+                              .shootTimer=ENEMY_SHOOT_INTERVAL, .aiType=AI_GUARDIAN, .sightRange=1600.0f, .sightAngle=120.0f, .rotation=(float)GetRandomValue(0,360)};
 }

@@ -7,13 +7,9 @@ static Texture2D playerProfileTexture;
 static bool playerProfileLoaded = false;
 
 // --- HUD icons (next to the portrait) ---
-// --- HUD icons (next to the portrait) ---
 static Texture2D hudLevelTexture;
 static Texture2D hudWeaponTexture;
 static Texture2D hudBulletTexture;
-static Texture2D texKnife;
-static Texture2D texHandgun;
-static Texture2D texRifle;
 static bool hudIconsLoaded = false;
 
 static void LoadHudIcons(void) {
@@ -22,9 +18,6 @@ static void LoadHudIcons(void) {
     hudLevelTexture = LoadTexture("assets/hud/level.png");
     hudWeaponTexture = LoadTexture("assets/hud/weapon.png");
     hudBulletTexture = LoadTexture("assets/hud/bullet.png");
-    texKnife = LoadTexture("assets/better_character/knife/idle/survivor-idle_knife_0.png");
-    texHandgun = LoadTexture("assets/better_character/handgun/idle/survivor-idle_handgun_0.png");
-    texRifle = LoadTexture("assets/better_character/rifle/idle/survivor-idle_rifle_0.png");
 
     // Consider icons "loaded" even if one is missing; we'll guard on .id when drawing.
     hudIconsLoaded = true;
@@ -36,16 +29,10 @@ static void UnloadHudIcons(void) {
     if (hudLevelTexture.id != 0) UnloadTexture(hudLevelTexture);
     if (hudWeaponTexture.id != 0) UnloadTexture(hudWeaponTexture);
     if (hudBulletTexture.id != 0) UnloadTexture(hudBulletTexture);
-    if (texKnife.id != 0) UnloadTexture(texKnife);
-    if (texHandgun.id != 0) UnloadTexture(texHandgun);
-    if (texRifle.id != 0) UnloadTexture(texRifle);
 
     hudLevelTexture = (Texture2D){0};
     hudWeaponTexture = (Texture2D){0};
     hudBulletTexture = (Texture2D){0};
-    texKnife = (Texture2D){0};
-    texHandgun = (Texture2D){0};
-    texRifle = (Texture2D){0};
     hudIconsLoaded = false;
 }
 
@@ -170,7 +157,6 @@ void Hud_Shutdown(void) {
 
 void Hud_DrawPlayer(const Entity *player) {
     if (!player) return;
-    const Inventory *inv = &player->inventory;
 
     LoadHudIcons();
 
@@ -181,68 +167,10 @@ void Hud_DrawPlayer(const Entity *player) {
     // Place icon rows to the right of portrait.
     const float portraitW = 200.0f;
     const float iconStartX = topLeft.x + portraitW + 18.0f;
-    
-    // Draw Gun List below profile
-    float gunListY = topLeft.y + 155.0f + 10.0f; // Below the panel
-    // DrawText("INVENTORY:", (int)topLeft.x, (int)gunListY, 18, LIGHTGRAY); // Optional header
-    // gunListY += 20.0f;
-
-    for (int i = 0; i < MAX_GUN_SLOTS; i++) {
-        const Gun *g = &inv->gunSlots[i];
-        
-        // Determine properties
-        bool have = (g->type != GUN_NONE);
-        Color textColor = have ? WHITE : DARKGRAY;
-        if (i == inv->currentGunIndex && have) textColor = GOLD; // Highlight selected
-
-        const char *name = "EMPTY";
-        Texture2D icon = {0};
-        
-        if (have) {
-             switch (g->type) {
-                case GUN_KNIFE: name = "KNIFE"; icon = texKnife; break;
-                case GUN_HANDGUN: name = "HANDGUN"; icon = texHandgun; break;
-                case GUN_RIFLE: name = "RIFLE"; icon = texRifle; break;
-                case GUN_SHOTGUN: name = "SHOTGUN"; icon = texRifle; break; // Placeholder
-                default: name = "UNKNOWN"; break;
-            }
-        } 
-
-        // Draw Format: "1) [ICON] NAME"
-        // Text "1) "
-        DrawText(TextFormat("%d)", i + 1), (int)topLeft.x + 10, (int)gunListY + 12, 20, textColor);
-        
-        // Icon (if exists)
-        if (icon.id != 0) {
-             // Crop center of player sprite or just draw it?
-             // These are full player sprites (256x256 typically). We need to scale/crop.
-             // Let's assume we maintain aspect ratio but fit in small box.
-             float scale = 0.2f;
-             // DrawTextureEx(icon, (Vector2){topLeft.x + 35, gunListY - 10}, 0.0f, scale, WHITE);
-             // Better: Crop header/feet? The icons are full body idle.
-             // We'll just draw the whole thing scaled down.
-             Rectangle src = {0, 0, (float)icon.width, (float)icon.height};
-             Rectangle dst = {topLeft.x + 40, gunListY, 40, 40};
-             // DrawTexturePro(icon, src, dst, (Vector2){0,0}, 0.0f, have ? WHITE : Fade(WHITE, 0.3f));
-             
-             // Just draw a slice? No, scaling is safer.
-             // Center alignment
-             float aspect = src.width / src.height;
-             if (aspect > 1) { dst.height = dst.width / aspect; }
-             else { dst.width = dst.height * aspect; }
-             
-             DrawTexturePro(icon, src, dst, (Vector2){0,0}, 0.0f, have ? WHITE : Fade(BLACK, 0.5f));
-        }
-
-        // Name
-        DrawText(name, (int)topLeft.x + 90, (int)gunListY + 12, 20, textColor);
-        
-        gunListY += 45.0f;
-    }
-
     const float lineY0 = topLeft.y;
     const float lineGap = 36.0f;
 
+    const Inventory *inv = &player->inventory;
     const Gun *currentGun = &inv->gunSlots[inv->currentGunIndex];
     
     bool hasGunEquipped = (currentGun->type != GUN_NONE && currentGun->type != GUN_KNIFE);

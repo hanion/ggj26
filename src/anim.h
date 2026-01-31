@@ -26,4 +26,8 @@ Texture2D AnimPlayer_GetFrame(const AnimPlayer *player);
 // True when a non-looping player has reached the last frame.
 bool AnimPlayer_IsFinished(const AnimPlayer *player);
 
+// Draw the current frame of an AnimPlayer centered at world position with uniform scale.
+// This is used for Epilog NPCs.
+void DrawAnimPlayer(const AnimPlayer *player, Vector2 position, float scale, Color tint);
+
 #endif // ANIM_H

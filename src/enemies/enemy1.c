@@ -68,8 +68,8 @@ bool CheckLineOfSight(Entity *enemy, Vector2 target, Level *level) {
     // Check Doors (Closed ones check)
     for (int i = 0; i < level->doorCount; i++) {
         // If door is closed, it blocks sight
-        if (!level->doors[i].isOpen) {
-            if (CheckCollisionSegmentRec(enemy->position, target, level->doors[i].rect)) {
+        if (!level->doorsOpen[i]) {
+            if (CheckCollisionSegmentRec(enemy->position, target, level->doors[i])) {
                 return false;
             }
         }
@@ -94,8 +94,8 @@ static bool MoveEnemyWithCollision(Entity *enemy, Vector2 delta, const Level *le
         }
     }
     for (int i = 0; i < level->doorCount && !blocked_x; i++) {
-        if (CheckCollisionCircleRec(enemy->position, enemy->radius, level->doors[i].rect)) {
-             if (enemy->identity.permissionLevel < level->doors[i].requiredPerm && !level->doors[i].isOpen) {
+        if (CheckCollisionCircleRec(enemy->position, enemy->radius, level->doors[i])) {
+             if (enemy->identity.permissionLevel < level->doorPerms[i] && !level->doorsOpen[i]) {
                 blocked_x = true;
             }
         }
@@ -117,8 +117,8 @@ static bool MoveEnemyWithCollision(Entity *enemy, Vector2 delta, const Level *le
         }
     }
     for (int i = 0; i < level->doorCount && !blocked_y; i++) {
-        if (CheckCollisionCircleRec(enemy->position, enemy->radius, level->doors[i].rect)) {
-             if (enemy->identity.permissionLevel < level->doors[i].requiredPerm && !level->doors[i].isOpen) {
+        if (CheckCollisionCircleRec(enemy->position, enemy->radius, level->doors[i])) {
+             if (enemy->identity.permissionLevel < level->doorPerms[i] && !level->doorsOpen[i]) {
                 blocked_y = true;
             }
         }
@@ -135,7 +135,7 @@ static bool MoveEnemyWithCollision(Entity *enemy, Vector2 delta, const Level *le
 void UpdateEnemy(Entity *enemy, Vector2 playerPos, Level *level, Bullet *bulletPool,
                  int maxBullets, float dt) {
   if (!enemy->active) return;
-  if (enemy->state == STATE_BEING_CHOKED) return; // Frozen while being choked
+  if (!enemy->isEnemy) return;
   
   bool seesPlayer = CheckLineOfSight(enemy, playerPos, level);
   
@@ -150,13 +150,11 @@ void UpdateEnemy(Entity *enemy, Vector2 playerPos, Level *level, Bullet *bulletP
   } else {
       if (enemy->state == STATE_ATTACK) {
           // Lost sight
-          enemy->state = STATE_SEARCH; // Both types search now
-          enemy->searchTimer = enemy->IGotHitImSearchingThePlayerForHowManySeconds; // Use configured time
-          // Or should we use a shorter time if just lost sight vs hit? 
-          // User said "If cant see player even if in that position it will search for a time called IGotHit..."
-          // This applies to the HIT case.
-          // For natural lost sight, maybe keep it similar or shorter?
-          // Let's use the variable to be consistent with "Search" property.
+          if (enemy->aiType == AI_WALKER) {
+              enemy->state = STATE_SEARCH;
+          } else {
+              enemy->state = STATE_IDLE; // Guardians just stop
+          }
       }
   }
 
@@ -180,8 +178,8 @@ void UpdateEnemy(Entity *enemy, Vector2 playerPos, Level *level, Bullet *bulletP
               int doorIdx = Gameplay_GetClosestDoor(level, enemy->position);
               if (doorIdx != -1) {
                   Vector2 doorCenter = {
-                      level->doors[doorIdx].rect.x + level->doors[doorIdx].rect.width/2,
-                      level->doors[doorIdx].rect.y + level->doors[doorIdx].rect.height/2
+                      level->doors[doorIdx].x + level->doors[doorIdx].width/2,
+                      level->doors[doorIdx].y + level->doors[doorIdx].height/2
                   };
                   Vector2 toDoor = Vector2Subtract(doorCenter, enemy->position);
                   float targetAngle = atan2f(toDoor.y, toDoor.x) * RAD2DEG;
@@ -219,7 +217,7 @@ void UpdateEnemy(Entity *enemy, Vector2 playerPos, Level *level, Bullet *bulletP
               float angleDiff = targetAngle - enemy->rotation;
                 while (angleDiff > 180) angleDiff -= 360;
                 while (angleDiff < -180) angleDiff += 360;
-              enemy->rotation += angleDiff * 70.0f * dt;
+              enemy->rotation += angleDiff * 5.0f * dt;
 
               
               if (enemy->aiType == AI_WALKER) {
@@ -258,49 +256,34 @@ void UpdateEnemy(Entity *enemy, Vector2 playerPos, Level *level, Bullet *bulletP
           
       case STATE_SEARCH:
           if (enemy->aiType == AI_WALKER) {
-               // Walker: Move to last known position
+               // Move to last known position
                Vector2 toLast = Vector2Subtract(enemy->lastKnownPlayerPos, enemy->position);
                float dist = Vector2Length(toLast);
                
                if (dist > 20) {
                    // Moving to search target
                    Vector2 delta = Vector2Scale(Vector2Normalize(toLast), enemy->identity.speed * dt);
-                   bool bumped = MoveEnemyWithCollision(enemy, delta, level); 
+                   bool bumped = MoveEnemyWithCollision(enemy, delta, level); // This handles walls
                    
+                   // If we bumped into something while searching, just stop and look around
                    if (bumped) {
-                        dist = 0; 
+                        dist = 0; // Force transition to "Arrived" logic below
                    } else {
                         float targetAngle = atan2f(toLast.y, toLast.x) * RAD2DEG;
-                        float angleDiff = targetAngle - enemy->rotation;
-                        while (angleDiff > 180) angleDiff -= 360;
-                        while (angleDiff < -180) angleDiff += 360;
-                        enemy->rotation += angleDiff * 15.0f * dt; 
+                        enemy->rotation = targetAngle;
                    }
                }
                
                if (dist <= 20) {
-                   // Arrived, look around
+                   // Arrived at last known, wait 3 seconds
                    enemy->searchTimer -= dt;
-                   enemy->rotation += 180 * dt; 
+                   // Spin around looking
+                   enemy->rotation += 90 * dt; 
                    
                    if (enemy->searchTimer <= 0) {
-                       enemy->state = STATE_PATROL;
-                       enemy->searchTimer = 0.5f; 
+                       enemy->state = STATE_PATROL; // Return to patrol logic
+                       enemy->searchTimer = 0.1f; // Wait a bit before starting patrol
                    }
-               }
-          } else if (enemy->aiType == AI_GUARDIAN) {
-               // Guardian: Stationary Search
-               // Just turn towards the threat and wait
-               Vector2 toLast = Vector2Subtract(enemy->lastKnownPlayerPos, enemy->position);
-               float targetAngle = atan2f(toLast.y, toLast.x) * RAD2DEG;
-               float angleDiff = targetAngle - enemy->rotation;
-               while (angleDiff > 180) angleDiff -= 360;
-               while (angleDiff < -180) angleDiff += 360;
-               enemy->rotation += angleDiff * 15.0f * dt; // Fast turn to look
-
-               enemy->searchTimer -= dt;
-               if (enemy->searchTimer <= 0) {
-                   enemy->state = STATE_IDLE; // Return to post
                }
           }
           break;
@@ -320,12 +303,7 @@ void UpdateEnemy(Entity *enemy, Vector2 playerPos, Level *level, Bullet *bulletP
                       enemy->state = STATE_IDLE;
                       enemy->searchTimer = 0.5f; // Wait briefly
                   } else {
-                      float targetAngle = atan2f(toTarget.y, toTarget.x) * RAD2DEG;
-                      // Smooth rotation
-                      float angleDiff = targetAngle - enemy->rotation;
-                      while (angleDiff > 180) angleDiff -= 360;
-                      while (angleDiff < -180) angleDiff += 360;
-                      enemy->rotation += angleDiff * 3.0f * dt; // Slower turn for patrol
+                      enemy->rotation = atan2f(toTarget.y, toTarget.x) * RAD2DEG;
                   }
               } else {
                   // Reached patrol point

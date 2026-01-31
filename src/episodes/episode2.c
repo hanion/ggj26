@@ -30,9 +30,9 @@ void InitEpisode2(Level *level) {
     // Gate to Zone 2
     level->walls[level->wallCount++] = (Rectangle){1500, 0, 50, 300};
     level->walls[level->wallCount++] = (Rectangle){1500, 420, 50, 300};
-    level->doors[level->doorCount].rect = (Rectangle){1500, 300, 50, 120};
-    level->doors[level->doorCount].requiredPerm = PERM_STAFF;
-    level->doors[level->doorCount].isOpen = false;
+    level->doors[level->doorCount] = (Rectangle){1500, 300, 50, 120};
+    level->doorPerms[level->doorCount] = PERM_STAFF;
+    level->doorsOpen[level->doorCount] = false;
     level->doorCount++;
 
     // Zone 2: Office Cubicles (Staff -> Guard)
@@ -44,9 +44,9 @@ void InitEpisode2(Level *level) {
     // Gate to Zone 3
     level->walls[level->wallCount++] = (Rectangle){3000, 0, 50, 300};
     level->walls[level->wallCount++] = (Rectangle){3000, 420, 50, 300};
-    level->doors[level->doorCount].rect = (Rectangle){3000, 300, 50, 120};
-    level->doors[level->doorCount].requiredPerm = PERM_GUARD;
-    level->doors[level->doorCount].isOpen = false;
+    level->doors[level->doorCount] = (Rectangle){3000, 300, 50, 120};
+    level->doorPerms[level->doorCount] = PERM_GUARD;
+    level->doorsOpen[level->doorCount] = false;
     level->doorCount++;
 
     // Zone 3: High Security / Server Room (Guard -> Admin)
@@ -58,9 +58,9 @@ void InitEpisode2(Level *level) {
     // Gate to Zone 4
     level->walls[level->wallCount++] = (Rectangle){4500, 0, 50, 300};
     level->walls[level->wallCount++] = (Rectangle){4500, 420, 50, 300};
-    level->doors[level->doorCount].rect = (Rectangle){4500, 300, 50, 120};
-    level->doors[level->doorCount].requiredPerm = PERM_ADMIN;
-    level->doors[level->doorCount].isOpen = false;
+    level->doors[level->doorCount] = (Rectangle){4500, 300, 50, 120};
+    level->doorPerms[level->doorCount] = PERM_ADMIN;
+    level->doorsOpen[level->doorCount] = false;
     level->doorCount++;
 
     // Zone 4: Executive / Admin Area (Admin)
@@ -102,8 +102,4 @@ void InitEpisode2(Level *level) {
     level->enemies[level->enemyCount++] = InitEnemy((Vector2){5500, 100}, ENEMY_ADMIN);
     level->enemies[level->enemyCount++] = InitEnemy((Vector2){5500, 600}, ENEMY_ADMIN);
     level->enemies[level->enemyCount++] = InitEnemy((Vector2){6000, 360}, ENEMY_ADMIN); // Final boss
-}
-
-void UnloadEpisode2() {
-
 }

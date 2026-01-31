@@ -9,7 +9,7 @@ int Gameplay_GetClosestEnemyInRange(const Level *level, Vector2 position, float 
     float closestDist = range;
     int closestIndex = -1;
     for (int i = 0; i < level->enemyCount; i++) {
-        if (!level->enemies[i].active) {
+        if (!level->enemies[i].active || !level->enemies[i].isEnemy) {
             continue;
         }
         float dist = Vector2Distance(position, level->enemies[i].position);
@@ -64,10 +64,9 @@ int Gameplay_GetClosestDoor(const Level *level, Vector2 position) {
     float closestDistSqr = 99999999.0f;
 
     for (int i = 0; i < level->doorCount; i++) {
-        Rectangle r = level->doors[i].rect;
         Vector2 center = { 
-            r.x + r.width/2,
-            r.y + r.height/2
+            level->doors[i].x + level->doors[i].width/2,
+            level->doors[i].y + level->doors[i].height/2
         };
         float d2 = Vector2DistanceSqr(position, center);
         if (d2 < closestDistSqr) {
@@ -77,5 +76,4 @@ int Gameplay_GetClosestDoor(const Level *level, Vector2 position) {
     }
     return closestIdx;
 }
-
 

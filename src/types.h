@@ -27,10 +27,20 @@ typedef enum {
   ENEMY_ADMIN
 } EnemyType;
 
+// NPC Types
+typedef enum {
+  NPC_NONE = 0,
+  NPC_KIZ,
+  NPC_COCUK,
+  NPC_BALIKCI,
+  NPC_SIGARACI
+} NpcType;
+
 // AI Behavior Types
 typedef enum {
   AI_WALKER,
-  AI_GUARDIAN
+  AI_GUARDIAN,
+  AI_NONE
 } AIType;
 
 // AI States
@@ -38,8 +48,7 @@ typedef enum {
   STATE_IDLE,
   STATE_PATROL,
   STATE_ATTACK,
-  STATE_SEARCH,
-  STATE_BEING_CHOKED
+  STATE_SEARCH
 } EnemyState;
 
 // --- GUN SYSTEM ---
