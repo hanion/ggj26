@@ -103,6 +103,10 @@ static int npcPromptIndex = -1;
 static int npcInteractionIndex = -1;
 static float npcInteractionTimer = 0.0f;
 static float npcInteractionRange = 80.0f;
+static float npcPromptHorizontalOffset = 25.0f;
+static float npcPromptVerticalOffset = 30.0f;
+static float npcLabelHorizontalOffset = 20.0f;
+static float npcLabelVerticalOffset = 45.0f;
 
 // Debug
 static bool playerDebugDraw = false;
@@ -579,7 +583,7 @@ static void UpdateGame(float dt) {
                 continue;
             }
             float dist = Vector2Distance(player.position, currentLevel.enemies[i].position);
-            if (dist <= closestDist) {
+            if (dist < closestDist) {
                 closestDist = dist;
                 npcPromptIndex = i;
             }
@@ -1023,7 +1027,7 @@ static void DrawGame(void) {
         if (npcPromptIndex >= 0 && npcPromptIndex < currentLevel.enemyCount &&
             currentLevel.enemies[npcPromptIndex].active && currentLevel.enemies[npcPromptIndex].isInteractive) {
             Vector2 npcPos = currentLevel.enemies[npcPromptIndex].position;
-            DrawText("PRESS E", (int)npcPos.x - 25, (int)npcPos.y - 30, 10, WHITE);
+            DrawText("PRESS E", (int)(npcPos.x - npcPromptHorizontalOffset), (int)(npcPos.y - npcPromptVerticalOffset), 12, WHITE);
         }
 
         if (npcInteractionIndex >= 0 && npcInteractionIndex < currentLevel.enemyCount &&
@@ -1046,7 +1050,7 @@ static void DrawGame(void) {
                     break;
             }
             Vector2 npcPos = currentLevel.enemies[npcInteractionIndex].position;
-            DrawText(npcLabel, (int)npcPos.x - 20, (int)npcPos.y - 45, 10, WHITE);
+            DrawText(npcLabel, (int)(npcPos.x - npcLabelHorizontalOffset), (int)(npcPos.y - npcLabelVerticalOffset), 12, WHITE);
         }
         
         // Debug

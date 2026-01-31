@@ -26,7 +26,7 @@ void InitEpisode0(Level *level) {
     level->doorCount = 0;
     level->enemyCount = 0;
 
-    Identity npcIdentity = GetIdentity(ENEMY_CIVILIAN);
+    Identity civilianIdentity = GetIdentity(ENEMY_CIVILIAN);
 
     level->enemies[level->enemyCount++] = (Entity){
         .position = {140.0f, 300.0f},
@@ -36,7 +36,7 @@ void InitEpisode0(Level *level) {
         .isInteractive = true,
         .npcType = NPC_KIZ,
         .radius = 20.0f,
-        .identity = npcIdentity,
+        .identity = civilianIdentity,
         .aiType = AI_NONE,
         .state = STATE_IDLE
     };
@@ -49,7 +49,7 @@ void InitEpisode0(Level *level) {
         .isInteractive = true,
         .npcType = NPC_COCUK,
         .radius = 20.0f,
-        .identity = npcIdentity,
+        .identity = civilianIdentity,
         .aiType = AI_NONE,
         .state = STATE_IDLE
     };
@@ -62,7 +62,7 @@ void InitEpisode0(Level *level) {
         .isInteractive = true,
         .npcType = NPC_BALIKCI,
         .radius = 20.0f,
-        .identity = npcIdentity,
+        .identity = civilianIdentity,
         .aiType = AI_NONE,
         .state = STATE_IDLE
     };
@@ -75,7 +75,7 @@ void InitEpisode0(Level *level) {
         .isInteractive = true,
         .npcType = NPC_SIGARACI,
         .radius = 20.0f,
-        .identity = npcIdentity,
+        .identity = civilianIdentity,
         .aiType = AI_NONE,
         .state = STATE_IDLE
     };
