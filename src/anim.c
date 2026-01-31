@@ -265,3 +265,13 @@ bool AnimPlayer_IsFinished(const AnimPlayer *player) {
     if (player->loop) return false;
     return player->frame_index >= (player->clip->frame_count - 1);
 }
+
+void DrawAnimPlayer(const AnimPlayer *player, Vector2 position, float scale, Color tint) {
+    Texture2D frame = AnimPlayer_GetFrame(player);
+    if (frame.id == 0) return;
+
+    Rectangle src = (Rectangle){0, 0, (float)frame.width, (float)frame.height};
+    Rectangle dst = (Rectangle){position.x, position.y, (float)frame.width * scale, (float)frame.height * scale};
+    Vector2 origin = (Vector2){dst.width * 0.5f, dst.height * 0.5f};
+    DrawTexturePro(frame, src, dst, origin, 0.0f, tint);
+}

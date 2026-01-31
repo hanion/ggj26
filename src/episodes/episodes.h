@@ -1,5 +1,4 @@
-#ifndef EPISODES_H
-#define EPISODES_H
+#pragma once
 
 #include "../levels.h"
 
@@ -7,5 +6,3 @@
 void InitEpisode0(Level *level);
 void InitEpisode1(Level *level);
 void InitEpisode2(Level *level);
-
-#endif // EPISODES_H

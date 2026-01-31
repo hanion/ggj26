@@ -135,6 +135,7 @@ static bool MoveEnemyWithCollision(Entity *enemy, Vector2 delta, const Level *le
 void UpdateEnemy(Entity *enemy, Vector2 playerPos, Level *level, Bullet *bulletPool,
                  int maxBullets, float dt) {
   if (!enemy->active) return;
+  if (!enemy->isEnemy) return;
   
   bool seesPlayer = CheckLineOfSight(enemy, playerPos, level);
   
