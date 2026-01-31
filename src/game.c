@@ -282,6 +282,11 @@ static void UpdateGame(float dt) {
         }
         return;
     }
+    
+    // Helper function to check if player has a gun equipped
+    bool hasGunEquipped = (player.equipmentState == PLAYER_EQUIP_HANDGUN ||
+                          player.equipmentState == PLAYER_EQUIP_RIFLE ||
+                          player.equipmentState == PLAYER_EQUIP_SHOTGUN);
 
     // Player Update
     UpdatePlayer(&player, &currentLevel, dt);
@@ -338,10 +343,7 @@ static void UpdateGame(float dt) {
 
     // Reload input (R key)
     if (IsKeyPressed(KEY_R) && !player.isReloading) {
-        bool canReload = (player.equipmentState == PLAYER_EQUIP_HANDGUN ||
-                         player.equipmentState == PLAYER_EQUIP_RIFLE ||
-                         player.equipmentState == PLAYER_EQUIP_SHOTGUN) &&
-                        player.magAmmo < MAG_SIZE && player.reserveAmmo > 0;
+        bool canReload = hasGunEquipped && player.magAmmo < MAG_SIZE && player.reserveAmmo > 0;
         if (canReload) {
             player.isReloading = true;
             player.reloadTimer = RELOAD_DURATION;
@@ -351,11 +353,7 @@ static void UpdateGame(float dt) {
     // Player Shooting
     bool shootPressed = IsMouseButtonPressed(MOUSE_LEFT_BUTTON) || IsKeyPressed(KEY_SPACE);
     if (shootPressed) {
-        bool canShoot = (player.equipmentState == PLAYER_EQUIP_HANDGUN ||
-                        player.equipmentState == PLAYER_EQUIP_RIFLE ||
-                        player.equipmentState == PLAYER_EQUIP_SHOTGUN) &&
-                       HasAbility(player.identity, ABILITY_SHOOT) &&
-                       !player.isReloading;
+        bool canShoot = hasGunEquipped && HasAbility(player.identity, ABILITY_SHOOT) && !player.isReloading;
         
         if (canShoot) {
             if (player.magAmmo > 0) {

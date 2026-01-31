@@ -230,10 +230,8 @@ void PlayerRender_Update(PlayerRender *pr, const Entity *player, float dt, float
         AnimClip *clip = GetWeaponClip(pr, player->equipmentState, pr->weaponState);
         if (clip) {
             AnimPlayer_SetClip(&pr->weaponAnim, clip);
-            // Don't loop reload animation
-            if (nextWeapon == PR_WEAPON_RELOAD) {
-                pr->weaponAnim.loop = false;
-            }
+            // Don't loop reload animation, but loop all others
+            pr->weaponAnim.loop = (nextWeapon != PR_WEAPON_RELOAD);
         }
     }
 
