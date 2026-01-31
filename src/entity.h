@@ -53,6 +53,19 @@ typedef struct {
   Vector2 lastKnownPlayerPos;
   float searchTimer;      // How long to search/investigate
   Vector2 patrolStart;    // Home position for patrolling
+  
+  // Stats
+  float health;
+  float maxHealth;
+  float speedMultiplier;
+  bool isInvisible;
+  bool haveMask; // Determines if this enemy drops a mask
+  float IGotHitImSearchingThePlayerForHowManySeconds; // Hit reaction search duration
+  
+  // Choking State
+  bool isChoking;
+  float chokeTimer;
+  int chokeTargetIndex;
 } Entity;
 
 typedef struct {
@@ -62,6 +75,7 @@ typedef struct {
   bool active;
   float lifeTime;     // Optional: cleanup bullets after some time
   bool isPlayerOwned; // True = Player shot, False = Enemy shot
+  float damage;       // NEW: Damage carried by the bullet
 } Bullet;
 
 #endif // ENTITY_H
