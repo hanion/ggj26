@@ -300,15 +300,24 @@ static void DrawMenu(void) {
     EndDrawing();
 }
 
+// Developer Mode
+static bool developerMode = false;
+
 static void UpdateGame(float dt) {
     // Update Camera Offset
     camera.offset = (Vector2){ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f };
 
-    // Debug Toggle
+    // Debug Toggle F1
     if (IsKeyPressed(KEY_F1)) {
         playerDebugDraw = !playerDebugDraw;
     }
+    
+    // Developer Mode Toggle F
+    if (IsKeyPressed(KEY_F)) {
+        developerMode = !developerMode;
+    }
 
+    // Game Over / Win Logic Inputs
     if (gameOver || gameWon) {
         // GAME OVER
         if (gameOver) {
@@ -371,7 +380,7 @@ static void UpdateGame(float dt) {
                           player.equipmentState == PLAYER_EQUIP_SHOTGUN);
 
     // Player Update
-    UpdatePlayer(&player, &currentLevel, dt);
+    UpdatePlayer(&player, &currentLevel, dt, developerMode);
 
     // Detect equipment changes
     if (player.equipmentState != lastEquipmentState) {
@@ -519,7 +528,9 @@ static void UpdateGame(float dt) {
         } else {
             // Check against Player
             if (CheckCollisionCircles(bullets[i].position, bullets[i].radius, player.position, player.radius)) {
-                gameOver = true;
+                if (!developerMode) {
+                    gameOver = true;
+                }
                 bullets[i].active = false;
             }
         }
@@ -537,10 +548,12 @@ static void UpdateGame(float dt) {
         }
     }
 
-    // Door State Logic
+    // Door State Logic (Also respect Dev Mode)
     for (int i = 0; i < currentLevel.doorCount; i++) {
-        if (CheckCollisionCircleRec(player.position, player.radius, currentLevel.doors[i]) &&
-            player.identity.permissionLevel >= currentLevel.doorPerms[i]) {
+        bool sufficientPerm = player.identity.permissionLevel >= currentLevel.doorPerms[i];
+        if (developerMode) sufficientPerm = true; // Override in dev mode
+        
+        if (CheckCollisionCircleRec(player.position, player.radius, currentLevel.doors[i]) && sufficientPerm) {
             currentLevel.doorsOpen[i] = true;
         } else {
             currentLevel.doorsOpen[i] = false;
@@ -729,6 +742,10 @@ static void DrawGame(void) {
 
     if (levelStartTimer > 0) {
         DrawText("READY...", GetScreenWidth()/2 - 50, GetScreenHeight()/2, 30, RED);
+    }
+    
+    if (developerMode) {
+        DrawText("DEV MODE ON (F) - GOD & UNLOCK", 10, 10, 20, GREEN);
     }
     }
     EndDrawing();
