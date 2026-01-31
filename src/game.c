@@ -304,7 +304,11 @@ static void UpdateGame(float dt) {
     // Update Camera Offset
     camera.offset = (Vector2){ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f };
 
-    // Game Over / Win Logic Inputs
+    // Debug Toggle
+    if (IsKeyPressed(KEY_F1)) {
+        playerDebugDraw = !playerDebugDraw;
+    }
+
     if (gameOver || gameWon) {
         // GAME OVER
         if (gameOver) {
@@ -594,7 +598,9 @@ static void DrawGame(void) {
         DrawTexturePro(texZone7, (Rectangle){0,0,texZone7.width,texZone7.height}, (Rectangle){162,1507,795,805}, (Vector2){0,0}, 0.f, WHITE);
 
         // Draw Level Elements
-        for (int i = 0; i < currentLevel.wallCount; i++) DrawRectangleRec(currentLevel.walls[i], GRAY);
+        if (playerDebugDraw) {
+            for (int i = 0; i < currentLevel.wallCount; i++) DrawRectangleRec(currentLevel.walls[i], Fade(RED, 0.5f));
+        }
         for (int i = 0; i < currentLevel.doorCount; i++) {
             if (!currentLevel.doorsOpen[i]) {
                 DrawRectangleRec(currentLevel.doors[i], Fade(BLUE, 0.3f));
@@ -606,7 +612,7 @@ static void DrawGame(void) {
 
         if (currentLevel.id == 1) {
              DrawText("ZONE 1: STAFF ONLY", 400, 300, 30, Fade(WHITE, 0.1f));
-             DrawText("EXIT", 3200, 300, 40, Fade(GREEN, 0.5f));
+             DrawText("EXIT", 480, 2340, 40, Fade(GREEN, 0.5f));
         }
 
         // Enemies
