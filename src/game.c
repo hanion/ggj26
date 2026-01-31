@@ -10,8 +10,8 @@
 #include "entity.h"
 #include "episodes/episodes.h"
 #include "levels.h"
-#include "player.h"
-#include "player_render.h"
+#include "player/player.h"
+#include "player/player_render.h"
 #include "types.h"
 
 // Game Constants
@@ -532,9 +532,8 @@ static void DrawGame(void) {
         }
 
         if (playerRender.loaded) {
-            // Draw muzzle flash behind the player (draw-order based).
-            PlayerRender_DrawMuzzleFlash(&playerRender, &player, weaponShootTimer);
             PlayerRender_Draw(&playerRender, &player);
+            PlayerRender_DrawMuzzleFlash(&playerRender, &player, weaponShootTimer);
         } else {
             DrawPlayerFallback(player.position, player.radius);
         }
