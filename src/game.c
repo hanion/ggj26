@@ -40,33 +40,70 @@ static Entity droppedMask;
 static bool maskActive;
 
 typedef enum {
-    PLAYER_ANIM_IDLE,
-    PLAYER_ANIM_WALK
-} PlayerAnimState;
+    PLAYER_FEET_IDLE,
+    PLAYER_FEET_WALK,
+    PLAYER_FEET_RUN,
+    PLAYER_FEET_STRAFE_LEFT,
+    PLAYER_FEET_STRAFE_RIGHT
+} PlayerFeetAnimState;
 
 typedef enum {
-    PLAYER_GUN_EQUIP,
-    PLAYER_GUN_IDLE,
-    PLAYER_GUN_WALK,
-    PLAYER_GUN_SHOOT
-} PlayerGunAnimState;
+    PLAYER_WEAPON_IDLE,
+    PLAYER_WEAPON_MOVE,
+    PLAYER_WEAPON_SHOOT,
+    PLAYER_WEAPON_RELOAD,
+    PLAYER_WEAPON_MELEE
+} PlayerWeaponAnimState;
 
-static AnimClip playerIdleClip;
-static AnimClip playerWalkClip;
-static AnimClip playerGunIdleClip;
-static AnimClip playerGunWalkClip;
-static AnimClip playerGunShootClip;
-static AnimPlayer playerAnim;
-static AnimPlayer playerGunAnim;
+// Feet animations
+static AnimClip feetIdleClip;
+static AnimClip feetWalkClip;
+static AnimClip feetRunClip;
+static AnimClip feetStrafeLeftClip;
+static AnimClip feetStrafeRightClip;
+
+// Weapon animations - Handgun
+static AnimClip handgunIdleClip;
+static AnimClip handgunMoveClip;
+static AnimClip handgunShootClip;
+static AnimClip handgunReloadClip;
+static AnimClip handgunMeleeClip;
+
+// Weapon animations - Rifle
+static AnimClip rifleIdleClip;
+static AnimClip rifleMoveClip;
+static AnimClip rifleShootClip;
+static AnimClip rifleReloadClip;
+static AnimClip rifleMeleeClip;
+
+// Weapon animations - Shotgun
+static AnimClip shotgunIdleClip;
+static AnimClip shotgunMoveClip;
+static AnimClip shotgunShootClip;
+static AnimClip shotgunReloadClip;
+static AnimClip shotgunMeleeClip;
+
+// Weapon animations - Flashlight
+static AnimClip flashlightIdleClip;
+static AnimClip flashlightMoveClip;
+static AnimClip flashlightMeleeClip;
+
+// Weapon animations - Knife
+static AnimClip knifeIdleClip;
+static AnimClip knifeMoveClip;
+static AnimClip knifeMeleeClip;
+
+static AnimPlayer feetAnim;
+static AnimPlayer weaponAnim;
 static Texture2D playerShadow;
 static bool playerAnimLoaded;
-static bool playerGunAnimLoaded;
-static PlayerAnimState playerAnimState;
-static PlayerGunAnimState playerGunAnimState;
+static bool weaponAnimLoaded;
+static PlayerFeetAnimState feetAnimState;
+static PlayerWeaponAnimState weaponAnimState;
 static const float playerSpriteScale = 0.3f;
 static const Vector2 playerSpritePivot = {0.5f, 0.5f};
-static const float playerGunShootHold = 0.2f;
-static float playerGunShootTimer = 0.0f;
+static const float weaponShootHold = 0.2f;
+static float weaponShootTimer = 0.0f;
 static const float meleeRange = 80.0f;
 static const float meleePromptOffset = 25.0f;
 static const float meleePromptHorizontalOffset = 40.0f;
@@ -193,8 +230,8 @@ static void HandleEnemyKilled(int enemyIndex) {
     droppedMask.radius = droppedMaskRadius;
     droppedMask.active = true;
     if (player.equipmentState == PLAYER_EQUIP_BARE_HANDS) {
-        player.equipmentState = PLAYER_EQUIP_GUN;
-        TraceLog(LOG_INFO, "Player granted gun after first kill");
+        player.equipmentState = PLAYER_EQUIP_HANDGUN;
+        TraceLog(LOG_INFO, "Player granted handgun after first kill");
     }
 }
 
@@ -218,9 +255,9 @@ static void StartLevel(int episodeId) {
 
     // Player
     player = InitPlayer(currentLevel.playerSpawn, currentLevel.playerStartId);
-    player.equipmentState = PLAYER_EQUIP_BARE_HANDS;
+    player.equipmentState = PLAYER_EQUIP_KNIFE;
     player.rotation = 0.0f;
-    playerGunShootTimer = 0.0f;
+    weaponShootTimer = 0.0f;
     lastEquipmentState = player.equipmentState;
 
     // Camera
@@ -231,42 +268,110 @@ static void StartLevel(int episodeId) {
     camera.zoom = 1.0f;
 
     if (playerAnimLoaded) {
-        UnloadAnimClip(&playerIdleClip);
-        UnloadAnimClip(&playerWalkClip);
+        // Unload feet animations
+        UnloadAnimClip(&feetIdleClip);
+        UnloadAnimClip(&feetWalkClip);
+        UnloadAnimClip(&feetRunClip);
+        UnloadAnimClip(&feetStrafeLeftClip);
+        UnloadAnimClip(&feetStrafeRightClip);
         if (playerShadow.id != 0) {
             UnloadTexture(playerShadow);
             playerShadow = (Texture2D){0};
         }
         playerAnimLoaded = false;
     }
-    if (playerGunAnimLoaded) {
-        UnloadAnimClip(&playerGunIdleClip);
-        UnloadAnimClip(&playerGunWalkClip);
-        UnloadAnimClip(&playerGunShootClip);
-        playerGunAnimLoaded = false;
+    if (weaponAnimLoaded) {
+        // Unload handgun animations
+        UnloadAnimClip(&handgunIdleClip);
+        UnloadAnimClip(&handgunMoveClip);
+        UnloadAnimClip(&handgunShootClip);
+        UnloadAnimClip(&handgunReloadClip);
+        UnloadAnimClip(&handgunMeleeClip);
+        
+        // Unload rifle animations
+        UnloadAnimClip(&rifleIdleClip);
+        UnloadAnimClip(&rifleMoveClip);
+        UnloadAnimClip(&rifleShootClip);
+        UnloadAnimClip(&rifleReloadClip);
+        UnloadAnimClip(&rifleMeleeClip);
+        
+        // Unload shotgun animations
+        UnloadAnimClip(&shotgunIdleClip);
+        UnloadAnimClip(&shotgunMoveClip);
+        UnloadAnimClip(&shotgunShootClip);
+        UnloadAnimClip(&shotgunReloadClip);
+        UnloadAnimClip(&shotgunMeleeClip);
+        
+        // Unload flashlight animations
+        UnloadAnimClip(&flashlightIdleClip);
+        UnloadAnimClip(&flashlightMoveClip);
+        UnloadAnimClip(&flashlightMeleeClip);
+        
+        // Unload knife animations
+        UnloadAnimClip(&knifeIdleClip);
+        UnloadAnimClip(&knifeMoveClip);
+        UnloadAnimClip(&knifeMeleeClip);
+        
+        weaponAnimLoaded = false;
     }
-    playerIdleClip = LoadAnimClip("assets/character/LightArtilleryRobot/idle60", 30.0f);
-    playerWalkClip = LoadAnimClip("assets/character/LightArtilleryRobot/walk60", 60.0f);
-    playerGunIdleClip = LoadAnimClip("assets/character/LightArtilleryRobot/idle60", 30.0f);
-    playerGunWalkClip = LoadAnimClip("assets/character/LightArtilleryRobot/walk60", 60.0f);
-    playerGunShootClip = LoadAnimClip("assets/character/LightArtilleryRobot/shootGun20", 60.0f);
+    
+    // Load feet animations (1 frame for idle, 20 frames for others)
+    feetIdleClip = LoadAnimClip("assets/better/character/feet/idle", 30.0f);
+    feetWalkClip = LoadAnimClip("assets/better/character/feet/walk", 30.0f);
+    feetRunClip = LoadAnimClip("assets/better/character/feet/run", 30.0f);
+    feetStrafeLeftClip = LoadAnimClip("assets/better/character/feet/strafe_left", 30.0f);
+    feetStrafeRightClip = LoadAnimClip("assets/better/character/feet/strafe_right", 30.0f);
+    
+    // Load handgun animations
+    handgunIdleClip = LoadAnimClip("assets/better/character/handgun/idle", 30.0f);
+    handgunMoveClip = LoadAnimClip("assets/better/character/handgun/move", 30.0f);
+    handgunShootClip = LoadAnimClip("assets/better/character/handgun/shoot", 60.0f);
+    handgunReloadClip = LoadAnimClip("assets/better/character/handgun/reload", 30.0f);
+    handgunMeleeClip = LoadAnimClip("assets/better/character/handgun/meleeattack", 30.0f);
+    
+    // Load rifle animations
+    rifleIdleClip = LoadAnimClip("assets/better/character/rifle/idle", 30.0f);
+    rifleMoveClip = LoadAnimClip("assets/better/character/rifle/move", 30.0f);
+    rifleShootClip = LoadAnimClip("assets/better/character/rifle/shoot", 60.0f);
+    rifleReloadClip = LoadAnimClip("assets/better/character/rifle/reload", 30.0f);
+    rifleMeleeClip = LoadAnimClip("assets/better/character/rifle/meleeattack", 30.0f);
+    
+    // Load shotgun animations (using rifle for now since spec doesn't list shotgun separately)
+    shotgunIdleClip = LoadAnimClip("assets/better/character/rifle/idle", 30.0f);
+    shotgunMoveClip = LoadAnimClip("assets/better/character/rifle/move", 30.0f);
+    shotgunShootClip = LoadAnimClip("assets/better/character/rifle/shoot", 60.0f);
+    shotgunReloadClip = LoadAnimClip("assets/better/character/rifle/reload", 30.0f);
+    shotgunMeleeClip = LoadAnimClip("assets/better/character/rifle/meleeattack", 30.0f);
+    
+    // Load flashlight animations
+    flashlightIdleClip = LoadAnimClip("assets/better/character/flashlight/idle", 30.0f);
+    flashlightMoveClip = LoadAnimClip("assets/better/character/flashlight/move", 30.0f);
+    flashlightMeleeClip = LoadAnimClip("assets/better/character/flashlight/meleeattack", 30.0f);
+    
+    // Load knife animations
+    knifeIdleClip = LoadAnimClip("assets/better/character/knife/idle", 30.0f);
+    knifeMoveClip = LoadAnimClip("assets/better/character/knife/move", 30.0f);
+    knifeMeleeClip = LoadAnimClip("assets/better/character/knife/meleeattack", 30.0f);
+    
+    // Load shadow (TODO: update path when shadow asset is available)
     playerShadow = LoadTexture("assets/character/LightArtilleryRobot/shadow.png");
-    playerAnimLoaded = playerIdleClip.frame_count > 0 && playerWalkClip.frame_count > 0 &&
-                       playerShadow.id != 0;
-    playerGunAnimLoaded = playerGunIdleClip.frame_count > 0 &&
-                          playerGunWalkClip.frame_count > 0 &&
-                          playerGunShootClip.frame_count > 0;
-    playerAnim = (AnimPlayer){0};
-    playerGunAnim = (AnimPlayer){0};
-    playerAnimState = PLAYER_ANIM_IDLE;
-    playerGunAnimState = PLAYER_GUN_IDLE;
-    AnimPlayer_SetClip(&playerAnim, &playerIdleClip);
-    if (playerGunAnimLoaded) {
-        AnimPlayer_SetClip(&playerGunAnim, &playerGunIdleClip);
+    
+    playerAnimLoaded = feetIdleClip.frame_count > 0 && feetWalkClip.frame_count > 0;
+    weaponAnimLoaded = handgunIdleClip.frame_count > 0 && knifeIdleClip.frame_count > 0;
+    
+    feetAnim = (AnimPlayer){0};
+    weaponAnim = (AnimPlayer){0};
+    feetAnimState = PLAYER_FEET_IDLE;
+    weaponAnimState = PLAYER_WEAPON_IDLE;
+    
+    AnimPlayer_SetClip(&feetAnim, &feetIdleClip);
+    if (weaponAnimLoaded) {
+        AnimPlayer_SetClip(&weaponAnim, &knifeIdleClip);
     }
+    
     playerFramePivotReady = false;
     if (playerAnimLoaded) {
-        UpdatePlayerPivotFromFrame(AnimPlayer_GetFrame(&playerAnim));
+        UpdatePlayerPivotFromFrame(AnimPlayer_GetFrame(&feetAnim));
     }
     if (!playerAnimLoaded) {
         TraceLog(LOG_ERROR, "Player animation assets missing, using fallback");
@@ -362,24 +467,44 @@ static void UpdateGame(float dt) {
     // Player Update
     UpdatePlayer(&player, &currentLevel, dt);
 
-    // Detect equipment changes (used to kick off one-shot equip animation).
+    // Detect equipment changes
     if (player.equipmentState != lastEquipmentState) {
-        if (player.equipmentState == PLAYER_EQUIP_GUN && playerGunAnimLoaded) {
-            playerGunShootTimer = 0.0f;
-            playerGunAnimState = PLAYER_GUN_EQUIP;
-            AnimPlayer_SetClip(&playerGunAnim, &playerGunIdleClip); // takeAimGun40
-            playerGunAnim.loop = false; // play once and hold last frame
+        weaponShootTimer = 0.0f;
+        weaponAnimState = PLAYER_WEAPON_IDLE;
+        // Set appropriate weapon animation clip based on new equipment
+        switch (player.equipmentState) {
+            case PLAYER_EQUIP_HANDGUN:
+                AnimPlayer_SetClip(&weaponAnim, &handgunIdleClip);
+                break;
+            case PLAYER_EQUIP_RIFLE:
+                AnimPlayer_SetClip(&weaponAnim, &rifleIdleClip);
+                break;
+            case PLAYER_EQUIP_SHOTGUN:
+                AnimPlayer_SetClip(&weaponAnim, &shotgunIdleClip);
+                break;
+            case PLAYER_EQUIP_FLASHLIGHT:
+                AnimPlayer_SetClip(&weaponAnim, &flashlightIdleClip);
+                break;
+            case PLAYER_EQUIP_KNIFE:
+                AnimPlayer_SetClip(&weaponAnim, &knifeIdleClip);
+                break;
+            case PLAYER_EQUIP_BARE_HANDS:
+            default:
+                break;
         }
         lastEquipmentState = player.equipmentState;
     }
-    PlayerAnimState nextState =
-        Vector2Length(player.velocity) > 0.01f ? PLAYER_ANIM_WALK : PLAYER_ANIM_IDLE;
-    if (nextState != playerAnimState) {
-        playerAnimState = nextState;
-        AnimPlayer_SetClip(&playerAnim,
-                           playerAnimState == PLAYER_ANIM_WALK ? &playerWalkClip : &playerIdleClip);
+    // Update feet animation based on movement
+    PlayerFeetAnimState nextFeetState = PLAYER_FEET_IDLE;
+    if (Vector2Length(player.velocity) > 0.01f) {
+        nextFeetState = PLAYER_FEET_WALK;
     }
-    AnimPlayer_Update(&playerAnim, dt);
+    if (nextFeetState != feetAnimState) {
+        feetAnimState = nextFeetState;
+        AnimPlayer_SetClip(&feetAnim,
+                           feetAnimState == PLAYER_FEET_WALK ? &feetWalkClip : &feetIdleClip);
+    }
+    AnimPlayer_Update(&feetAnim, dt);
 
     // Camera Update
     camera.target = Vector2Lerp(camera.target, player.position, 0.1f);
@@ -400,44 +525,70 @@ static void UpdateGame(float dt) {
     float aimDeg = atan2f(aimDirNormalized.y, aimDirNormalized.x) * RAD2DEG;
 
     player.rotation = aimDeg + spriteFacingOffsetDeg;
-    if (playerGunShootTimer > 0.0f) {
-        playerGunShootTimer -= dt;
-        if (playerGunShootTimer < 0.0f) {
-            playerGunShootTimer = 0.0f;
+    if (weaponShootTimer > 0.0f) {
+        weaponShootTimer -= dt;
+        if (weaponShootTimer < 0.0f) {
+            weaponShootTimer = 0.0f;
         }
     }
 
-    if (player.equipmentState == PLAYER_EQUIP_GUN && playerGunAnimLoaded) {
-        // If we're in the one-shot equip anim, let it finish before entering idle/walk.
-        if (playerGunAnimState == PLAYER_GUN_EQUIP) {
-            AnimPlayer_Update(&playerGunAnim, dt);
-            if (AnimPlayer_IsFinished(&playerGunAnim)) {
-                playerGunAnimState = PLAYER_GUN_IDLE;
-                AnimPlayer_SetClip(&playerGunAnim, &playerGunIdleClip);
-                playerGunAnim.loop = true;
-            }
-        } else {
-            PlayerGunAnimState gunNextState = PLAYER_GUN_IDLE;
-            if (playerGunShootTimer > 0.0f) {
-                gunNextState = PLAYER_GUN_SHOOT;
-            } else if (Vector2Length(player.velocity) > 0.01f) {
-                gunNextState = PLAYER_GUN_WALK;
-            }
-            if (gunNextState != playerGunAnimState) {
-                playerGunAnimState = gunNextState;
-                AnimPlayer_SetClip(&playerGunAnim,
-                                   playerGunAnimState == PLAYER_GUN_SHOOT ? &playerGunShootClip :
-                                   playerGunAnimState == PLAYER_GUN_WALK ? &playerGunWalkClip :
-                                                                           &playerGunIdleClip);
-                playerGunAnim.loop = true;
-            }
-            AnimPlayer_Update(&playerGunAnim, dt);
+    // Update weapon animations
+    if (player.equipmentState != PLAYER_EQUIP_BARE_HANDS && weaponAnimLoaded) {
+        PlayerWeaponAnimState weaponNextState = PLAYER_WEAPON_IDLE;
+        if (weaponShootTimer > 0.0f) {
+            weaponNextState = PLAYER_WEAPON_SHOOT;
+        } else if (Vector2Length(player.velocity) > 0.01f) {
+            weaponNextState = PLAYER_WEAPON_MOVE;
         }
+        
+        if (weaponNextState != weaponAnimState) {
+            weaponAnimState = weaponNextState;
+            // Set appropriate clip based on weapon type and state
+            AnimClip *targetClip = NULL;
+            switch (player.equipmentState) {
+                case PLAYER_EQUIP_HANDGUN:
+                    targetClip = weaponAnimState == PLAYER_WEAPON_SHOOT ? &handgunShootClip :
+                                 weaponAnimState == PLAYER_WEAPON_MOVE ? &handgunMoveClip :
+                                 &handgunIdleClip;
+                    break;
+                case PLAYER_EQUIP_RIFLE:
+                    targetClip = weaponAnimState == PLAYER_WEAPON_SHOOT ? &rifleShootClip :
+                                 weaponAnimState == PLAYER_WEAPON_MOVE ? &rifleMoveClip :
+                                 &rifleIdleClip;
+                    break;
+                case PLAYER_EQUIP_SHOTGUN:
+                    targetClip = weaponAnimState == PLAYER_WEAPON_SHOOT ? &shotgunShootClip :
+                                 weaponAnimState == PLAYER_WEAPON_MOVE ? &shotgunMoveClip :
+                                 &shotgunIdleClip;
+                    break;
+                case PLAYER_EQUIP_FLASHLIGHT:
+                    targetClip = weaponAnimState == PLAYER_WEAPON_SHOOT ? &flashlightMeleeClip :
+                                 weaponAnimState == PLAYER_WEAPON_MOVE ? &flashlightMoveClip :
+                                 &flashlightIdleClip;
+                    break;
+                case PLAYER_EQUIP_KNIFE:
+                    targetClip = weaponAnimState == PLAYER_WEAPON_SHOOT ? &knifeMeleeClip :
+                                 weaponAnimState == PLAYER_WEAPON_MOVE ? &knifeMoveClip :
+                                 &knifeIdleClip;
+                    break;
+                default:
+                    break;
+            }
+            if (targetClip != NULL) {
+                AnimPlayer_SetClip(&weaponAnim, targetClip);
+                weaponAnim.loop = true;
+            }
+        }
+        AnimPlayer_Update(&weaponAnim, dt);
     }
 
     // Player Shooting
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-        if (player.equipmentState == PLAYER_EQUIP_GUN && HasAbility(player.identity, ABILITY_SHOOT)) {
+        bool canShoot = (player.equipmentState == PLAYER_EQUIP_HANDGUN ||
+                        player.equipmentState == PLAYER_EQUIP_RIFLE ||
+                        player.equipmentState == PLAYER_EQUIP_SHOTGUN) &&
+                       HasAbility(player.identity, ABILITY_SHOOT);
+        if (canShoot) {
             for (int i = 0; i < MAX_BULLETS; i++) {
                 if (!bullets[i].active) {
                     bullets[i].active = true;
@@ -446,7 +597,7 @@ static void UpdateGame(float dt) {
                     bullets[i].lifeTime = BULLET_LIFETIME;
                     bullets[i].isPlayerOwned = true;
                     bullets[i].velocity = Vector2Scale(aimDirNormalized, BULLET_SPEED);
-                    playerGunShootTimer = playerGunShootHold;
+                    weaponShootTimer = weaponShootHold;
                     break;
                 }
             }
@@ -454,7 +605,9 @@ static void UpdateGame(float dt) {
     }
 
     meleeTargetIndex = -1;
-    if (player.equipmentState == PLAYER_EQUIP_BARE_HANDS) {
+    if (player.equipmentState == PLAYER_EQUIP_KNIFE || 
+        player.equipmentState == PLAYER_EQUIP_FLASHLIGHT ||
+        player.equipmentState == PLAYER_EQUIP_BARE_HANDS) {
         meleeTargetIndex = GetClosestEnemyInRange(player.position, meleeRange);
         if (meleeTargetIndex != -1 && IsKeyPressed(KEY_E)) {
             HandleEnemyKilled(meleeTargetIndex);
@@ -602,19 +755,30 @@ static void DrawGame(void) {
         }
 
         if (playerAnimLoaded) {
-            Texture2D frame = AnimPlayer_GetFrame(&playerAnim);
-            if (player.equipmentState == PLAYER_EQUIP_GUN && playerGunAnimLoaded) {
-                Texture2D gunFrame = AnimPlayer_GetFrame(&playerGunAnim);
-                if (gunFrame.id != 0) {
-                    frame = gunFrame;
-                }
+            Texture2D feetFrame = AnimPlayer_GetFrame(&feetAnim);
+            Texture2D weaponFrame = (Texture2D){0};
+            
+            if (player.equipmentState != PLAYER_EQUIP_BARE_HANDS && weaponAnimLoaded) {
+                weaponFrame = AnimPlayer_GetFrame(&weaponAnim);
             }
-            if (playerShadow.id != 0 && frame.id != 0) {
+            
+            // Draw shadow
+            if (playerShadow.id != 0 && feetFrame.id != 0) {
                 DrawPlayerShadow(playerShadow, player.position);
             }
-            if (frame.id != 0) {
-                DrawPlayerFrame(frame, player.position, player.rotation);
-            } else {
+            
+            // Draw feet
+            if (feetFrame.id != 0) {
+                DrawPlayerFrame(feetFrame, player.position, player.rotation);
+            }
+            
+            // Draw weapon on top of feet
+            if (weaponFrame.id != 0) {
+                DrawPlayerFrame(weaponFrame, player.position, player.rotation);
+            }
+            
+            // Fallback if no frames loaded
+            if (feetFrame.id == 0 && weaponFrame.id == 0) {
                 DrawPlayerFallback(player.position, player.radius);
             }
         } else {
@@ -642,8 +806,16 @@ static void DrawGame(void) {
         // HUD
         DrawText(TextFormat("CURRENT LEVEL: %d", player.identity.permissionLevel),
                  20, 20, 20, WHITE);
-        DrawText(player.equipmentState == PLAYER_EQUIP_GUN ? "EQUIP: GUN" : "EQUIP: HANDS",
-                 20, 45, 16, WHITE);
+        const char *equipText = "EQUIP: HANDS";
+        switch (player.equipmentState) {
+            case PLAYER_EQUIP_KNIFE: equipText = "EQUIP: KNIFE"; break;
+            case PLAYER_EQUIP_FLASHLIGHT: equipText = "EQUIP: FLASHLIGHT"; break;
+            case PLAYER_EQUIP_HANDGUN: equipText = "EQUIP: HANDGUN"; break;
+            case PLAYER_EQUIP_RIFLE: equipText = "EQUIP: RIFLE"; break;
+            case PLAYER_EQUIP_SHOTGUN: equipText = "EQUIP: SHOTGUN"; break;
+            default: break;
+        }
+        DrawText(equipText, 20, 45, 16, WHITE);
     }
 
     EndDrawing();
@@ -667,16 +839,45 @@ void Game_Draw(void) {
 
 
 void Game_Shutdown(void) {
-    UnloadAnimClip(&playerIdleClip);
-    UnloadAnimClip(&playerWalkClip);
-    UnloadAnimClip(&playerGunIdleClip);
-    UnloadAnimClip(&playerGunWalkClip);
-    UnloadAnimClip(&playerGunShootClip);
+    // Unload feet animations
+    UnloadAnimClip(&feetIdleClip);
+    UnloadAnimClip(&feetWalkClip);
+    UnloadAnimClip(&feetRunClip);
+    UnloadAnimClip(&feetStrafeLeftClip);
+    UnloadAnimClip(&feetStrafeRightClip);
+    
+    // Unload weapon animations
+    UnloadAnimClip(&handgunIdleClip);
+    UnloadAnimClip(&handgunMoveClip);
+    UnloadAnimClip(&handgunShootClip);
+    UnloadAnimClip(&handgunReloadClip);
+    UnloadAnimClip(&handgunMeleeClip);
+    
+    UnloadAnimClip(&rifleIdleClip);
+    UnloadAnimClip(&rifleMoveClip);
+    UnloadAnimClip(&rifleShootClip);
+    UnloadAnimClip(&rifleReloadClip);
+    UnloadAnimClip(&rifleMeleeClip);
+    
+    UnloadAnimClip(&shotgunIdleClip);
+    UnloadAnimClip(&shotgunMoveClip);
+    UnloadAnimClip(&shotgunShootClip);
+    UnloadAnimClip(&shotgunReloadClip);
+    UnloadAnimClip(&shotgunMeleeClip);
+    
+    UnloadAnimClip(&flashlightIdleClip);
+    UnloadAnimClip(&flashlightMoveClip);
+    UnloadAnimClip(&flashlightMeleeClip);
+    
+    UnloadAnimClip(&knifeIdleClip);
+    UnloadAnimClip(&knifeMoveClip);
+    UnloadAnimClip(&knifeMeleeClip);
+    
     if (playerShadow.id != 0) {
         UnloadTexture(playerShadow);
         playerShadow = (Texture2D){0};
     }
     playerAnimLoaded = false;
-    playerGunAnimLoaded = false;
+    weaponAnimLoaded = false;
 }
 
