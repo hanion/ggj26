@@ -40,14 +40,17 @@ void PlayerActions_HandleEnemyKilled(Level *level,
 
     level->enemies[enemyIndex].active = false;
 
-    // Find first inactive mask slot
-    for (int i = 0; i < maxMasks; i++) {
-        if (!droppedMasks[i].active) {
-            droppedMasks[i].identity = level->enemies[enemyIndex].identity;
-            droppedMasks[i].position = level->enemies[enemyIndex].position;
-            droppedMasks[i].radius = droppedMaskRadius;
-            droppedMasks[i].active = true;
-            break;
+    // Drop mask if enemy has one
+    if (level->enemies[enemyIndex].haveMask) {
+        // Find first inactive mask slot
+        for (int i = 0; i < maxMasks; i++) {
+            if (!droppedMasks[i].active) {
+                droppedMasks[i].identity = level->enemies[enemyIndex].identity;
+                droppedMasks[i].position = level->enemies[enemyIndex].position;
+                droppedMasks[i].radius = droppedMaskRadius;
+                droppedMasks[i].active = true;
+                break;
+            }
         }
     }
     

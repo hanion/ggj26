@@ -23,8 +23,6 @@
 #include "player/player_actions.h"
 #include "player/player_render.h"
 #include "ui/hud.h"
-#include "types.h"
-#include "anim.h"
 
 // Game Constants
 #define MAX_BULLETS 100
@@ -290,13 +288,13 @@ void StartLevel(int id) {
         }
     }
 
-    if (texZone1.id == 0)texZone1 = LoadTexture("assets/environment/background_1.png");
-    if (texZone2.id == 0)texZone2 = LoadTexture("assets/environment/background_2.png");
-    if (texZone3.id == 0)texZone3 = LoadTexture("assets/environment/background_3.png");
-    if (texZone4.id == 0)texZone4 = LoadTexture("assets/environment/background_4.png");
-    if (texZone5.id == 0)texZone5 = LoadTexture("assets/environment/background_5.png");
-    if (texZone6.id == 0)texZone6 = LoadTexture("assets/environment/background_6.png");
-    if (texZone7.id == 0)texZone7 = LoadTexture("assets/environment/background_7.png");
+    if (texZone1.id == 0) texZone1 = LoadTexture("assets/environment/background_1.png");
+    if (texZone2.id == 0) texZone2 = LoadTexture("assets/environment/background_2.png");
+    if (texZone3.id == 0) texZone3 = LoadTexture("assets/environment/background_3.png");
+    if (texZone4.id == 0) texZone4 = LoadTexture("assets/environment/background_4.png");
+    if (texZone5.id == 0) texZone5 = LoadTexture("assets/environment/background_5.png");
+    if (texZone6.id == 0) texZone6 = LoadTexture("assets/environment/background_6.png");
+    if (texZone7.id == 0) texZone7 = LoadTexture("assets/environment/background_7.png");
 
     // Init Player Render
     PlayerRender_Init(&playerRender);
