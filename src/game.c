@@ -91,6 +91,10 @@ static PlayerEquipState lastEquipmentState = PLAYER_EQUIP_KNIFE;
 
 
 static int meleeTargetIndex = -1;
+static int interactTargetIndex = -1;
+static float npcInteractTimer = 0.0f;
+static NpcType npcInteractType = NPC_NONE;
+static Vector2 npcInteractPos = {0};
 static float meleeRange = 80.0f;
 static float meleePromptOffset = 40.0f;
 static float meleePromptHorizontalOffset = 40.0f;
@@ -162,6 +166,9 @@ void StartLevel(int id) {
     for(int i=0; i<MAX_CARDS; i++) droppedCards[i].active = false;
     // Reset guns
     for(int i=0; i<MAX_DROPPED_GUNS; i++) droppedGuns[i].active = false;
+    npcInteractTimer = 0.0f;
+    npcInteractType = NPC_NONE;
+    npcInteractPos = (Vector2){0};
     
     currentState = STATE_PLAYING;
     levelStartTimer = LEVEL_START_DELAY;
@@ -494,7 +501,7 @@ static void UpdateGame(float dt) {
 
     // 2. Player Shooting
     bool shootPressed = IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
-    if (shootPressed) {
+    if (shootPressed && currentLevel.id != 0) {
         bool canShoot = hasGunEquipped && !player.isReloading && weaponShootTimer <= 0;
         
         if (canShoot) {
@@ -553,6 +560,21 @@ static void UpdateGame(float dt) {
         }
     }
 
+    // 3.5 NPC Interaction (Episode 0)
+    interactTargetIndex = -1;
+    if (currentLevel.id == 0) {
+        interactTargetIndex = PlayerActions_GetClosestInteractiveNpcInRange(&currentLevel, player.position, meleeRange);
+        if (interactTargetIndex != -1 && IsKeyPressed(KEY_E)) {
+            npcInteractTimer = 2.0f;
+            npcInteractType = currentLevel.enemies[interactTargetIndex].npcType;
+            npcInteractPos = currentLevel.enemies[interactTargetIndex].position;
+        }
+    }
+    if (npcInteractTimer > 0.0f) {
+        npcInteractTimer -= dt;
+        if (npcInteractTimer < 0.0f) npcInteractTimer = 0.0f;
+    }
+
     // 4. Update Bullets
     for (int i = 0; i < MAX_BULLETS; i++) {
         if (!bullets[i].active) continue;
@@ -590,9 +612,11 @@ static void UpdateGame(float dt) {
                 if (currentLevel.enemies[e].active) {
                     if (CheckCollisionCircles(bullets[i].position, bullets[i].radius, currentLevel.enemies[e].position, currentLevel.enemies[e].radius)) {
                         // Kill Enemy
-                        PlayerActions_HandleEnemyKilled(&currentLevel, e, &player, droppedMasks, MAX_MASKS, droppedMaskRadius, droppedCards, MAX_CARDS, droppedGuns, MAX_DROPPED_GUNS);
-                        bullets[i].active = false;
-                        break;
+                        if (currentLevel.enemies[e].isEnemy) {
+                            PlayerActions_HandleEnemyKilled(&currentLevel, e, &player, droppedMasks, MAX_MASKS, droppedMaskRadius, droppedCards, MAX_CARDS, droppedGuns, MAX_DROPPED_GUNS);
+                            bullets[i].active = false;
+                            break;
+                        }
                     }
                 }
             }
@@ -963,6 +987,21 @@ static void DrawGame(void) {
         if (meleeTargetIndex >= 0 && meleeTargetIndex < currentLevel.enemyCount && currentLevel.enemies[meleeTargetIndex].active) {
              DrawText("PRESS E TO CHOKE", (int)player.position.x, (int)player.position.y - 60, 12, WHITE);
         }
+
+        // NPC Interaction Prompt
+        if (interactTargetIndex >= 0 && interactTargetIndex < currentLevel.enemyCount && currentLevel.enemies[interactTargetIndex].active) {
+             Vector2 promptPos = currentLevel.enemies[interactTargetIndex].position;
+             DrawText("PRESS E", (int)promptPos.x - 20, (int)promptPos.y - 40, 12, WHITE);
+        }
+
+        if (npcInteractTimer > 0.0f) {
+             const char *npcText = "NPC";
+             if (npcInteractType == NPC_KIZ) npcText = "KIZ";
+             else if (npcInteractType == NPC_COCUK) npcText = "COCUK";
+             else if (npcInteractType == NPC_BALIKCI) npcText = "BALIKCI";
+             else if (npcInteractType == NPC_SIGARACI) npcText = "SIGARACI";
+             DrawText(npcText, (int)npcInteractPos.x - 10, (int)npcInteractPos.y - 40, 12, WHITE);
+        }
         
         // Debug
         if (playerDebugDraw) {
@@ -1012,4 +1051,3 @@ void Game_Shutdown(void) {
     UnloadTexture(texZone6);
     UnloadTexture(texZone7);
 }
-

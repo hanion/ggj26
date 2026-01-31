@@ -50,6 +50,10 @@ typedef struct {
   Vector2 lastKnownPlayerPos;
   float searchTimer;      // How long to search/investigate
   Vector2 patrolStart;    // Home position for patrolling
+
+  bool isEnemy;
+  bool isInteractive;
+  NpcType npcType;
 } Entity;
 
 typedef struct {

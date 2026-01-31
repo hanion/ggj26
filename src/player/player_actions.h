@@ -11,6 +11,7 @@
 // Player-driven gameplay actions (combat/interaction helpers).
 
 int PlayerActions_GetClosestEnemyInRange(const Level *level, Vector2 position, float range);
+int PlayerActions_GetClosestInteractiveNpcInRange(const Level *level, Vector2 position, float range);
 
 void PlayerActions_HandleEnemyKilled(Level *level,
                                     int enemyIndex,

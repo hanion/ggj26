@@ -172,30 +172,37 @@ void InitEpisode1(Level *level) {
   // --- Enemies (Unique Keys) ---
   level->enemyCount = 7;
   // Z1 (450, 320) - Key Z1 (Staff) -> Walker
-  level->enemies[0] = (Entity){.position={450, 320}, .active=true, .isPlayer=false, .radius=20, .identity=idKeyZ1, 
-                              .shootTimer=ENEMY_SHOOT_INTERVAL, .aiType=AI_WALKER, .sightRange=1400.0f, .sightAngle=120.0f, .rotation=(float)GetRandomValue(0,360)};
+  level->enemies[0] = (Entity){.position={450, 320}, .active=true, .isPlayer=false, .radius=20, .identity=idKeyZ1,
+                              .shootTimer=ENEMY_SHOOT_INTERVAL, .aiType=AI_WALKER, .sightRange=1400.0f, .sightAngle=120.0f, .rotation=(float)GetRandomValue(0,360),
+                              .isEnemy=true};
   
   // Z2 (1350, 320) - Key Z2 (Guard) -> Guardian
-  level->enemies[1] = (Entity){.position={1350, 320}, .active=true, .isPlayer=false, .radius=20, .identity=idKeyZ2, 
-                              .shootTimer=ENEMY_SHOOT_INTERVAL, .aiType=AI_GUARDIAN, .sightRange=1600.0f, .sightAngle=120.0f, .rotation=(float)GetRandomValue(0,360)};
+  level->enemies[1] = (Entity){.position={1350, 320}, .active=true, .isPlayer=false, .radius=20, .identity=idKeyZ2,
+                              .shootTimer=ENEMY_SHOOT_INTERVAL, .aiType=AI_GUARDIAN, .sightRange=1600.0f, .sightAngle=120.0f, .rotation=(float)GetRandomValue(0,360),
+                              .isEnemy=true};
   
   // Z3 (2250, 320) - Key Z3 (Admin) -> Guardian
-  level->enemies[2] = (Entity){.position={2250, 320}, .active=true, .isPlayer=false, .radius=20, .identity=idKeyZ3, 
-                              .shootTimer=ENEMY_SHOOT_INTERVAL, .aiType=AI_GUARDIAN, .sightRange=1600.0f, .sightAngle=120.0f, .rotation=(float)GetRandomValue(0,360)};
+  level->enemies[2] = (Entity){.position={2250, 320}, .active=true, .isPlayer=false, .radius=20, .identity=idKeyZ3,
+                              .shootTimer=ENEMY_SHOOT_INTERVAL, .aiType=AI_GUARDIAN, .sightRange=1600.0f, .sightAngle=120.0f, .rotation=(float)GetRandomValue(0,360),
+                              .isEnemy=true};
   
   // Z4 (2250, 970) - Key Z4 (Guard) -> Guardian
-  level->enemies[3] = (Entity){.position={2250, 970}, .active=true, .isPlayer=false, .radius=20, .identity=idKeyZ4, 
-                              .shootTimer=ENEMY_SHOOT_INTERVAL, .aiType=AI_GUARDIAN, .sightRange=1600.0f, .sightAngle=120.0f, .rotation=(float)GetRandomValue(0,360)};
+  level->enemies[3] = (Entity){.position={2250, 970}, .active=true, .isPlayer=false, .radius=20, .identity=idKeyZ4,
+                              .shootTimer=ENEMY_SHOOT_INTERVAL, .aiType=AI_GUARDIAN, .sightRange=1600.0f, .sightAngle=120.0f, .rotation=(float)GetRandomValue(0,360),
+                              .isEnemy=true};
   
   // Z5 (1350, 970) - Key Z5 (Staff) -> Walker
-  level->enemies[4] = (Entity){.position={1350, 970}, .active=true, .isPlayer=false, .radius=20, .identity=idKeyZ5, 
-                              .shootTimer=ENEMY_SHOOT_INTERVAL, .aiType=AI_WALKER, .sightRange=1400.0f, .sightAngle=120.0f, .rotation=(float)GetRandomValue(0,360)};
+  level->enemies[4] = (Entity){.position={1350, 970}, .active=true, .isPlayer=false, .radius=20, .identity=idKeyZ5,
+                              .shootTimer=ENEMY_SHOOT_INTERVAL, .aiType=AI_WALKER, .sightRange=1400.0f, .sightAngle=120.0f, .rotation=(float)GetRandomValue(0,360),
+                              .isEnemy=true};
   
   // Z6 (500, 970) - Key Z6 (Admin) -> Guardian
-  level->enemies[5] = (Entity){.position={500, 970}, .active=true, .isPlayer=false, .radius=20, .identity=idKeyZ6, 
-                              .shootTimer=ENEMY_SHOOT_INTERVAL, .aiType=AI_GUARDIAN, .sightRange=1600.0f, .sightAngle=120.0f, .rotation=(float)GetRandomValue(0,360)};
+  level->enemies[5] = (Entity){.position={500, 970}, .active=true, .isPlayer=false, .radius=20, .identity=idKeyZ6,
+                              .shootTimer=ENEMY_SHOOT_INTERVAL, .aiType=AI_GUARDIAN, .sightRange=1600.0f, .sightAngle=120.0f, .rotation=(float)GetRandomValue(0,360),
+                              .isEnemy=true};
   
   // Z7 (500, 1900) - Final Guard -> Guardian
-  level->enemies[6] = (Entity){.position={500, 1900}, .active=true, .isPlayer=false, .radius=20, .identity=idKeyZ3, 
-                              .shootTimer=ENEMY_SHOOT_INTERVAL, .aiType=AI_GUARDIAN, .sightRange=1600.0f, .sightAngle=120.0f, .rotation=(float)GetRandomValue(0,360)};
+  level->enemies[6] = (Entity){.position={500, 1900}, .active=true, .isPlayer=false, .radius=20, .identity=idKeyZ3,
+                              .shootTimer=ENEMY_SHOOT_INTERVAL, .aiType=AI_GUARDIAN, .sightRange=1600.0f, .sightAngle=120.0f, .rotation=(float)GetRandomValue(0,360),
+                              .isEnemy=true};
 }

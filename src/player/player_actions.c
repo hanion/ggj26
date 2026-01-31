@@ -8,7 +8,25 @@ int PlayerActions_GetClosestEnemyInRange(const Level *level, Vector2 position, f
     float closestDist = range;
     int closestIndex = -1;
     for (int i = 0; i < level->enemyCount; i++) {
-        if (!level->enemies[i].active) {
+        if (!level->enemies[i].active || !level->enemies[i].isEnemy) {
+            continue;
+        }
+        float dist = Vector2Distance(position, level->enemies[i].position);
+        if (dist <= closestDist) {
+            closestDist = dist;
+            closestIndex = i;
+        }
+    }
+    return closestIndex;
+}
+
+int PlayerActions_GetClosestInteractiveNpcInRange(const Level *level, Vector2 position, float range) {
+    if (!level) return -1;
+
+    float closestDist = range;
+    int closestIndex = -1;
+    for (int i = 0; i < level->enemyCount; i++) {
+        if (!level->enemies[i].active || level->enemies[i].isEnemy || !level->enemies[i].isInteractive) {
             continue;
         }
         float dist = Vector2Distance(position, level->enemies[i].position);

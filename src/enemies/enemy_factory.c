@@ -10,6 +10,9 @@ Entity InitEnemy(Vector2 position, EnemyType type) {
     enemy.isPlayer = false;
     enemy.radius = 20.0f;
     enemy.shootTimer = ENEMY_SHOOT_INTERVAL;
+    enemy.isEnemy = true;
+    enemy.isInteractive = false;
+    enemy.npcType = NPC_NONE;
 
     switch (type) {
         case ENEMY_CIVILIAN:
@@ -67,4 +70,3 @@ Identity GetIdentity(EnemyType type) {
             return (Identity){0};
     }
 }
-

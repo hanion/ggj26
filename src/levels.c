@@ -12,6 +12,9 @@ void InitLevel(int episode, Level *level) {
   level->enemyCount = 0;
 
   switch (episode) {
+  case 0:
+    InitEpisode0(level);
+    break;
   case 1:
     InitEpisode1(level);
     break;

@@ -7,6 +7,9 @@ Entity InitPlayer(Vector2 spawnPos, Identity startIdentity) {
   player.active = true;
   player.identity = startIdentity;
   player.isPlayer = true;
+  player.isEnemy = false;
+  player.isInteractive = false;
+  player.npcType = NPC_NONE;
   player.radius = 20.0f;
   player.shootTimer = 0.0f;
   
