@@ -17,6 +17,7 @@ int main(void) {
     Game_Draw();
   }
 
+  Game_Shutdown();
   CloseWindow();
   return 0;
 }

@@ -18,7 +18,15 @@ else
     endif
 endif
 
-SRC = src/main.c src/game.c src/levels.c src/episodes/episode1.c src/episodes/episode2.c src/player.c src/enemies/enemy1.c src/enemies/enemy_factory.c
+SRC = src/main.c                \
+        src/game.c               \
+        src/levels.c            \
+        src/episodes/episode1.c  \
+        src/player.c             \
+        src/enemies/enemy1.c    \
+        src/anim.c               \
+        src/episodes/episode2.c  \
+        src/enemies/enemy_factory.c 
 
 ggj26: $(SRC)
 	$(CC) -o ggj26 $(SRC) $(CFLAGS) $(LDFLAGS) $(LIBS)

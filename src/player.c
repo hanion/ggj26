@@ -22,6 +22,8 @@ void UpdatePlayer(Entity *player, Level *currentLevel, float dt) {
   if (IsKeyDown(KEY_D))
     moveInput.x += 1.0f;
 
+  player->velocity = (Vector2){0};
+
   if (Vector2Length(moveInput) > 0) {
     moveInput = Vector2Normalize(moveInput);
     Vector2 nextPos = Vector2Add(
@@ -53,5 +55,6 @@ void UpdatePlayer(Entity *player, Level *currentLevel, float dt) {
     if (!blocked) {
       player->position = nextPos;
     }
+    player->velocity = Vector2Scale(moveInput, player->identity.speed);
   }
 }
