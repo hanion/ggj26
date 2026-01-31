@@ -4,7 +4,7 @@
 #include "../levels.h"
 
 // Episode Initializers
-// Episode Initializers
+void InitEpisode0(Level *level);
 void InitEpisode1(Level *level);
 void InitEpisode2(Level *level);
 

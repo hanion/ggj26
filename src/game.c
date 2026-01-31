@@ -83,6 +83,10 @@ static Texture2D texZone5;
 static Texture2D texZone6;
 static Texture2D texZone7;
 
+// Epilog map
+static Texture2D texEpilogMap;
+static const float EPILOG_WORLD_SCALE = 2.0f;
+
 // --- RENDER & GAMEPLAY STATES ---
 static PlayerRender playerRender;
 static float weaponShootTimer = 0.0f;
@@ -101,6 +105,7 @@ static bool playerDebugDraw = false;
 static float playerDebugCrossSize = 10.0f;
 
 // Menu Buttons
+static Rectangle btnEpilog;
 static Rectangle btnEpisode1;
 static Rectangle btnEpisode2;
 static Rectangle btnQuit;
@@ -213,6 +218,7 @@ void StartLevel(int id) {
     camera.zoom = 1.0f;
 
     // Load Textures
+    if (texEpilogMap.id == 0) texEpilogMap = LoadTexture("assets/map/prolog/epilog_map.png");
     if (texZone1.id == 0)texZone1 = LoadTexture("assets/environment/background_1.png");
     if (texZone2.id == 0)texZone2 = LoadTexture("assets/environment/background_2.png");
     if (texZone3.id == 0)texZone3 = LoadTexture("assets/environment/background_3.png");
@@ -242,13 +248,14 @@ void Game_Init(void) {
     int btnHeight = 50;
     int startY = sh / 2 - 50;
 
-    btnEpisode1 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY, (float)btnWidth, (float)btnHeight };
-    btnEpisode2 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 70, (float)btnWidth, (float)btnHeight };
-    btnQuit     = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 140, (float)btnWidth, (float)btnHeight };
+    btnEpilog   = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY, (float)btnWidth, (float)btnHeight };
+    btnEpisode1 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 70, (float)btnWidth, (float)btnHeight };
+    btnEpisode2 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 140, (float)btnWidth, (float)btnHeight };
+    btnQuit     = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 210, (float)btnWidth, (float)btnHeight };
     
     // Player-facing menu buttons reuse the same layout slots.
-    btnPlay     = btnEpisode1;
-    btnContinue = btnEpisode2;
+    btnPlay     = btnEpilog;
+    btnContinue = btnEpisode1;
 }
 
 // Helper for HighDPI Mouse Scaling
@@ -268,7 +275,9 @@ static bool UpdateMenu(void) {
     Vector2 mousePos = GetScaledMousePosition();
 
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-        if (CheckCollisionPointRec(mousePos, btnEpisode1)) {
+        if (CheckCollisionPointRec(mousePos, btnEpilog)) {
+            StartLevel(0);
+        } else if (CheckCollisionPointRec(mousePos, btnEpisode1)) {
             StartLevel(1);
         } else if (CheckCollisionPointRec(mousePos, btnEpisode2)) {
             StartLevel(2);
@@ -292,6 +301,10 @@ static void DrawMenu(void) {
     Color hoverColor = (Color){50, 50, 60, 255};
     Color normalColor = GRAY;
     Vector2 mousePos = GetScaledMousePosition();
+
+    // Epilog
+    DrawRectangleRec(btnEpilog, CheckCollisionPointRec(mousePos, btnEpilog) ? hoverColor : normalColor);
+    DrawText("EPILOG", btnEpilog.x + 55, btnEpilog.y + 15, 20, WHITE);
 
     // Episode 1
     DrawRectangleRec(btnEpisode1, CheckCollisionPointRec(mousePos, btnEpisode1) ? hoverColor : normalColor);
@@ -355,9 +368,9 @@ static void UpdateGame(float dt) {
             // Update progress context (used by Continue / Next).
             gameCtx.hasWonLastEpisode = true;
             GameContext_SaveFromPlayer(&gameCtx, &player);
-            if (currentLevel.id == 1) {
-                gameCtx.nextEpisodeId = 2;
-            }
+            // Story progression order: 0 (Epilog) -> 1 -> 2
+            if (currentLevel.id == 0) gameCtx.nextEpisodeId = 1;
+            if (currentLevel.id == 1) gameCtx.nextEpisodeId = 2;
 
             // Player builds: Next or Menu.
 #if !defined(DEV_MODE) || !(DEV_MODE)
@@ -802,20 +815,27 @@ static void DrawGame(void) {
     } else {
         BeginMode2D(camera);
 
-        // Zone 1
-        DrawTexturePro(texZone1, (Rectangle){0,0,texZone1.width,texZone1.height}, (Rectangle){0,0,913,642}, (Vector2){0,0}, 0.f, WHITE);
-        // Zone 2
-        DrawTexturePro(texZone2, (Rectangle){0,0,texZone2.width,texZone2.height}, (Rectangle){913,0,911,661}, (Vector2){0,0}, 0.f, WHITE);
-        // Zone 3
-        DrawTexturePro(texZone3, (Rectangle){0,0,texZone3.width,texZone3.height}, (Rectangle){1824,0,957,654}, (Vector2){0,0}, 0.f, WHITE);
-        // Zone 4
-        DrawTexturePro(texZone4, (Rectangle){0,0,texZone4.width,texZone4.height}, (Rectangle){1824,654,869,645}, (Vector2){0,0}, 0.f, WHITE);
-        // Zone 5
-        DrawTexturePro(texZone5, (Rectangle){0,0,texZone5.width,texZone5.height}, (Rectangle){957,654,867,649}, (Vector2){0,0}, 0.f, WHITE);
-        // Zone 6
-        DrawTexturePro(texZone6, (Rectangle){0,0,texZone6.width,texZone6.height}, (Rectangle){162,654,795,853}, (Vector2){0,0}, 0.f, WHITE);
-        // Zone 7
-        DrawTexturePro(texZone7, (Rectangle){0,0,texZone7.width,texZone7.height}, (Rectangle){162,1507,795,805}, (Vector2){0,0}, 0.f, WHITE);
+        if (currentLevel.id == 0) {
+            if (texEpilogMap.id != 0) {
+                DrawTextureEx(texEpilogMap, (Vector2){0, 0}, 0.0f, EPILOG_WORLD_SCALE, WHITE);
+            }
+        } else {
+
+            // Zone 1
+            DrawTexturePro(texZone1, (Rectangle){0,0,texZone1.width,texZone1.height}, (Rectangle){0,0,913,642}, (Vector2){0,0}, 0.f, WHITE);
+            // Zone 2
+            DrawTexturePro(texZone2, (Rectangle){0,0,texZone2.width,texZone2.height}, (Rectangle){913,0,911,661}, (Vector2){0,0}, 0.f, WHITE);
+            // Zone 3
+            DrawTexturePro(texZone3, (Rectangle){0,0,texZone3.width,texZone3.height}, (Rectangle){1824,0,957,654}, (Vector2){0,0}, 0.f, WHITE);
+            // Zone 4
+            DrawTexturePro(texZone4, (Rectangle){0,0,texZone4.width,texZone4.height}, (Rectangle){1824,654,869,645}, (Vector2){0,0}, 0.f, WHITE);
+            // Zone 5
+            DrawTexturePro(texZone5, (Rectangle){0,0,texZone5.width,texZone5.height}, (Rectangle){957,654,867,649}, (Vector2){0,0}, 0.f, WHITE);
+            // Zone 6
+            DrawTexturePro(texZone6, (Rectangle){0,0,texZone6.width,texZone6.height}, (Rectangle){162,654,795,853}, (Vector2){0,0}, 0.f, WHITE);
+            // Zone 7
+            DrawTexturePro(texZone7, (Rectangle){0,0,texZone7.width,texZone7.height}, (Rectangle){162,1507,795,805}, (Vector2){0,0}, 0.f, WHITE);
+        }
 
         // Draw Level Elements
         if (playerDebugDraw) {
@@ -1011,5 +1031,6 @@ void Game_Shutdown(void) {
     UnloadTexture(texZone5);
     UnloadTexture(texZone6);
     UnloadTexture(texZone7);
+    if (texEpilogMap.id != 0) UnloadTexture(texEpilogMap);
 }
 
