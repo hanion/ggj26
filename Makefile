@@ -35,7 +35,8 @@ SRC = src/main.c \
     src/enemies/enemy1.c \
     src/anim.c \
     src/episodes/episode2.c \
-    src/enemies/enemy_factory.c
+    src/enemies/enemy_factory.c \
+    src/gameplay_helpers.c
 
 ggj26: $(SRC)
 	$(CC) -o ggj26 $(SRC) $(CFLAGS) $(LDFLAGS) $(LIBS)

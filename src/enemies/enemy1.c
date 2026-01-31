@@ -1,5 +1,6 @@
 #include "enemy.h"
 #include "../../raylib/src/raymath.h"
+#include "../gameplay_helpers.h"
 
 
 #define ENEMY_SHOOT_INTERVAL 2.0f
@@ -165,6 +166,36 @@ void UpdateEnemy(Entity *enemy, Vector2 playerPos, Level *level, Bullet *bulletP
                   // Ensure random point is valid? For now just try to go there
                   enemy->lastKnownPlayerPos = Vector2Add(enemy->position, offset); 
                   enemy->state = STATE_PATROL;
+              }
+          } else if (enemy->aiType == AI_GUARDIAN) {
+              // GUARDIAN BEHAVIOR: Look at closest door
+              int doorIdx = Gameplay_GetClosestDoor(level, enemy->position);
+              if (doorIdx != -1) {
+                  Vector2 doorCenter = {
+                      level->doors[doorIdx].x + level->doors[doorIdx].width/2,
+                      level->doors[doorIdx].y + level->doors[doorIdx].height/2
+                  };
+                  Vector2 toDoor = Vector2Subtract(doorCenter, enemy->position);
+                  float targetAngle = atan2f(toDoor.y, toDoor.x) * RAD2DEG;
+                  
+                  // Add subtle random movement (idle jitter)
+                  // Change target slightly every second or so?
+                  // We can use searchTimer as a "jitter timer"
+                  enemy->searchTimer -= dt;
+                  if (enemy->searchTimer <= 0) {
+                       enemy->searchTimer = (float)GetRandomValue(5, 15) / 10.0f; // 0.5s - 1.5s
+                       // This is a bit hacky, storing offset in 'lastKnownPlayerPos.x' just for temp storage?
+                       // Or just add immediate noise.
+                       enemy->lastKnownPlayerPos.x = (float)GetRandomValue(-20, 20); 
+                  }
+                  
+                  targetAngle += enemy->lastKnownPlayerPos.x; // Add the noise
+
+                  // Smooth rotation
+                  float angleDiff = targetAngle - enemy->rotation;
+                  while (angleDiff > 180) angleDiff -= 360;
+                  while (angleDiff < -180) angleDiff += 360;
+                  enemy->rotation += angleDiff * 2.0f * dt; // Slow turn
               }
           }
           break;
