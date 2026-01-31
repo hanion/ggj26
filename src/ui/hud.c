@@ -105,11 +105,8 @@ static void DrawPlayerProfileHUD(Vector2 topLeft) {
             src.height = newH;
         }
 
-        // Raylib doesn't support arbitrary (triangle) clipping; draw full portrait into a rect
-        // then cover corners with triangles to create a "triangular" feel.
-        BeginScissorMode((int)dst.x, (int)dst.y, (int)dst.width, (int)dst.height);
         DrawTexturePro(playerProfileTexture, src, dst, (Vector2){0, 0}, 0.0f, WHITE);
-        EndScissorMode();
+        
 
         Color cover = Fade(BLACK, 0.55f);
         // Bottom-left cut
