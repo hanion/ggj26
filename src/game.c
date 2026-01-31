@@ -532,8 +532,9 @@ static void DrawGame(void) {
         }
 
         if (playerRender.loaded) {
-            PlayerRender_Draw(&playerRender, &player);
+            // Draw muzzle flash behind the player (draw-order based).
             PlayerRender_DrawMuzzleFlash(&playerRender, &player, weaponShootTimer);
+            PlayerRender_Draw(&playerRender, &player);
         } else {
             DrawPlayerFallback(player.position, player.radius);
         }

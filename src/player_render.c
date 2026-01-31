@@ -120,7 +120,7 @@ void PlayerRender_LoadEpisodeAssets(PlayerRender *pr) {
     pr->knifeMeleeClip = LoadAnimClip("assets/better_character/knife/meleeattack", 30.0f);
 
     pr->shadow = LoadTexture("assets/better_character/shadow.png");
-    pr->muzzleFlash = LoadTexture("assets/better_character/Survivor Spine/images/muzzle_flash_01.png");
+    pr->muzzleFlash = LoadTexture("assets/better_character/Survivor Spine/images/muzzle_flash_01-removebg-preview.png");
 
     pr->feetAnim = (AnimPlayer){0};
     pr->weaponAnim = (AnimPlayer){0};
@@ -263,7 +263,7 @@ void PlayerRender_Draw(const PlayerRender *pr, const Entity *player) {
 
 // Muzzle flash offset constants (easy to tweak)
 #define MUZZLE_OFFSET_X 40.0f
-#define MUZZLE_OFFSET_Y -5.0f
+#define MUZZLE_OFFSET_Y 16.0f
 
 void PlayerRender_DrawMuzzleFlash(const PlayerRender *pr, const Entity *player, float weaponShootTimer) {
     if (!pr || !pr->loaded || !player) return;
