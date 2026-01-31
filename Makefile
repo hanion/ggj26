@@ -23,6 +23,7 @@ SRC = src/main.c                \
         src/levels.c            \
         src/episodes/episode1.c  \
         src/player.c             \
+    src/player_render.c      \
         src/enemies/enemy1.c    \
         src/anim.c               \
         src/episodes/episode2.c  \
