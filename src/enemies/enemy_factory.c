@@ -11,6 +11,28 @@ Entity InitEnemy(Vector2 position, EnemyType type) {
     enemy.radius = 20.0f;
     enemy.shootTimer = ENEMY_SHOOT_INTERVAL;
 
+    switch (type) {
+        case ENEMY_CIVILIAN:
+        case ENEMY_STAFF:
+             enemy.aiType = AI_WALKER;
+             enemy.sightRange = 1400.0f;
+             enemy.sightAngle = 120.0f;
+             break;
+        case ENEMY_GUARD:
+        case ENEMY_ADMIN:
+             enemy.aiType = AI_GUARDIAN;
+             enemy.sightRange =1600.0f;
+             enemy.sightAngle = 120.0f;
+             break;
+    }
+    
+    enemy.state = STATE_IDLE;
+    enemy.patrolStart = position;
+    enemy.active = true;
+    
+    // Randomize initial rotation for variety
+    enemy.rotation = (float)GetRandomValue(0, 360);
+    
     enemy.identity = GetIdentity(type);
     return enemy;
 }

@@ -33,6 +33,15 @@ typedef struct {
   int reserveAmmo;  // Reserve ammo for reloading
   bool isReloading; // Is currently reloading
   float reloadTimer; // Timer for reload animation
+
+  // AI State
+  AIType aiType;
+  EnemyState state;
+  float sightRange;
+  float sightAngle;       // Degrees, full cone (e.g. 120)
+  Vector2 lastKnownPlayerPos;
+  float searchTimer;      // How long to search/investigate
+  Vector2 patrolStart;    // Home position for patrolling
 } Entity;
 
 typedef struct {

@@ -27,6 +27,20 @@ typedef enum {
   ENEMY_ADMIN
 } EnemyType;
 
+// AI Behavior Types
+typedef enum {
+  AI_WALKER,
+  AI_GUARDIAN
+} AIType;
+
+// AI States
+typedef enum {
+  STATE_IDLE,
+  STATE_PATROL,
+  STATE_ATTACK,
+  STATE_SEARCH
+} EnemyState;
+
 // The "Mask" or "Identity" that defines what an entity can do
 typedef struct {
   PermissionLevel permissionLevel;

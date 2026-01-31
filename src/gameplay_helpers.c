@@ -50,3 +50,5 @@ void Gameplay_HandleEnemyKilled(Level *level,
         TraceLog(LOG_INFO, "Player auto-equipped handgun after kill");
     }
 }
+
+
