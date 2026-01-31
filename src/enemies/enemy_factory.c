@@ -41,29 +41,25 @@ Identity GetIdentity(EnemyType type) {
     switch (type) {
         case ENEMY_CIVILIAN:
             return (Identity){
-                .permissionLevel = PERM_CIVILIAN,
-                .abilities = ABILITY_SHOOT,
+                .permissionLevel = PERM_NONE,
                 .color = BLUE,
                 .speed = 220.0f
             };
         case ENEMY_STAFF:
             return (Identity){
                 .permissionLevel = PERM_STAFF,
-                .abilities = ABILITY_SHOOT,
                 .color = GREEN,
                 .speed = 210.0f
             };
         case ENEMY_GUARD:
             return (Identity){
                 .permissionLevel = PERM_GUARD,
-                .abilities = ABILITY_SHOOT | ABILITY_PUNCH,
                 .color = RED,
                 .speed = 200.0f
             };
         case ENEMY_ADMIN:
             return (Identity){
                 .permissionLevel = PERM_ADMIN,
-                .abilities = ABILITY_SHOOT | ABILITY_PUNCH | ABILITY_DASH,
                 .color = PURPLE,
                 .speed = 250.0f
             };

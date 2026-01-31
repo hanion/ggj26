@@ -12,16 +12,7 @@
 typedef struct {
     bool valid;
     Identity identity;
-    PlayerEquipState equipped;
-    int magAmmo;
-    int reserveAmmo;
-
-    // Lightweight inventory (owned/unlocked weapons).
-    // Knife + bare hands are always available.
-    bool hasFlashlight;
-    bool hasHandgun;
-    bool hasRifle;
-    bool hasShotgun;
+    Inventory inventory;
 } PlayerContext;
 
 typedef struct {

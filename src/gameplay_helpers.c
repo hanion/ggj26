@@ -43,11 +43,17 @@ void Gameplay_HandleEnemyKilled(Level *level,
     droppedMask->radius = droppedMaskRadius;
     droppedMask->active = true;
 
-    // Auto-equip handgun after a kill (so player can shoot instead of staying on knife).
-    // If you later add actual weapon pickups, move this to that pickup logic instead.
-    if (player->equipmentState == PLAYER_EQUIP_KNIFE || player->equipmentState == PLAYER_EQUIP_BARE_HANDS) {
-        player->equipmentState = PLAYER_EQUIP_HANDGUN;
-        TraceLog(LOG_INFO, "Player auto-equipped handgun after kill");
+    // Auto-equip handgun after a kill if we are using knife/bare hands
+    GunType currentType = player->inventory.gunSlots[player->inventory.currentGunIndex].type;
+    if (currentType == GUN_KNIFE || currentType == GUN_NONE) {
+        // Find a handgun or better
+        for (int i=0; i<3; i++) {
+             if (player->inventory.gunSlots[i].type == GUN_HANDGUN) {
+                  player->inventory.currentGunIndex = i;
+                  TraceLog(LOG_INFO, "Player auto-switched to Handgun slot %d", i);
+                  break;
+             }
+        }
     }
 }
 

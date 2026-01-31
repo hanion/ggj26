@@ -3,15 +3,15 @@
 
 #include "../raylib/src/raylib.h"
 
-// Permission Levels for Doors/Zones
+// Permission Levels (Now mostly for Cards and Doors)
 typedef enum {
-  PERM_CIVILIAN = 0,
+  PERM_NONE = 0,
   PERM_STAFF = 1,
   PERM_GUARD = 2,
   PERM_ADMIN = 3
 } PermissionLevel;
 
-// Ability Flags (Bitmask)
+// Ability Flags (Bitmask) - Keeping for legacy check or new mask system
 typedef enum {
   ABILITY_NONE = 0,
   ABILITY_PUNCH = 1 << 0,
@@ -41,17 +41,82 @@ typedef enum {
   STATE_SEARCH
 } EnemyState;
 
-// The "Mask" or "Identity" that defines what an entity can do
-typedef struct {
-  PermissionLevel permissionLevel;
-  int abilities; // Bitwise combination of AbilityFlags
-  Color color;   // Visual representation (The Mask visual)
-  float speed;   // Movement speed modifier (optional but good for gameplay)
-} Identity;
+// --- GUN SYSTEM ---
+typedef enum {
+  GUN_NONE = 0,
+  GUN_KNIFE,
+  GUN_HANDGUN,
+  GUN_RIFLE,
+  GUN_SHOTGUN
+} GunType;
 
-// Quick helper for bitwise checks
-static inline bool HasAbility(Identity id, AbilityFlags flag) {
-  return (id.abilities & flag) != 0;
-}
+typedef struct {
+  GunType type;
+  int currentAmmo;
+  int maxAmmo;
+  int reserveAmmo;
+  float reloadTime;
+  float cooldown;     // Time between shots
+  float range;
+  float damage;
+  bool active;        // Does this slot have a gun?
+} Gun;
+
+typedef struct {
+    Vector2 position;
+    float radius;
+    bool active;
+    Gun gun;
+} DroppedGun;
+
+// --- MASK SYSTEM ---
+typedef enum {
+  MASK_NONE = 0,
+  MASK_SPEED,         // Run faster
+  MASK_STEALTH,       // Harder to see
+  MASK_STRENGTH,      // Better melee?
+  MASK_ADMIN          // Maybe specific abilities
+} MaskAbilityType;
+
+typedef struct {
+  MaskAbilityType type;
+  float maxDuration;  // Usually 10.0f
+  float currentTimer; // Counts down when active
+  bool isActive;      // Is the ability currently being used?
+  bool isBroken;      // If duration hits 0, it breaks
+  bool collected;     // Is this slot occupied?
+  Color color;        // Visual representation
+} Mask;
+
+// --- PERMISSION SYSTEM ---
+typedef struct {
+  PermissionLevel level;
+  bool collected;
+} PermissionCard;
+
+// --- INVENTORY ---
+#define MAX_GUN_SLOTS 3
+#define MAX_MASK_SLOTS 3
+
+typedef struct {
+  // Guns
+  Gun gunSlots[MAX_GUN_SLOTS];
+  int currentGunIndex; // 0, 1, 2
+
+  // Masks
+  Mask maskSlots[MAX_MASK_SLOTS];
+  int currentMaskIndex; // 0, 1, 2
+
+  // Keycard
+  PermissionCard card;
+} Inventory;
+
+// Legacy "Identity" needs to be refactored or kept for Enemies temporarily
+// For now, let's keep a simplified Identity for Enemies/Base Stats
+typedef struct {
+  PermissionLevel permissionLevel; // For enemies, innate access
+  float speed;
+  Color color;
+} Identity;
 
 #endif // TYPES_H

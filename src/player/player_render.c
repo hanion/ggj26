@@ -254,7 +254,7 @@ void PlayerRender_OnEquip(PlayerRender *pr, PlayerEquipState equip) {
     pr->lastEquip = equip;
 }
 
-void PlayerRender_Update(PlayerRender *pr, const Entity *player, float dt, float weaponShootTimer) {
+void PlayerRender_Update(PlayerRender *pr, const Entity *player, PlayerEquipState currentEquip, float dt, float weaponShootTimer) {
     if (!pr || !pr->loaded || !player) return;
 
     // Feet state
@@ -266,11 +266,11 @@ void PlayerRender_Update(PlayerRender *pr, const Entity *player, float dt, float
     AnimPlayer_Update(&pr->feetAnim, dt);
 
     // Equipment change
-    if (player->equipmentState != pr->lastEquip) {
-        PlayerRender_OnEquip(pr, player->equipmentState);
+    if (currentEquip != pr->lastEquip) {
+        PlayerRender_OnEquip(pr, currentEquip);
     }
 
-    if (player->equipmentState == PLAYER_EQUIP_BARE_HANDS) {
+    if (currentEquip == PLAYER_EQUIP_BARE_HANDS) {
         return;
     }
 
@@ -286,24 +286,30 @@ void PlayerRender_Update(PlayerRender *pr, const Entity *player, float dt, float
 
     if (nextWeapon != pr->weaponState) {
         pr->weaponState = nextWeapon;
-        AnimClip *clip = GetWeaponClip(pr, player->equipmentState, pr->weaponState);
+        AnimClip *clip = GetWeaponClip(pr, currentEquip, pr->weaponState);
         if (clip) {
             AnimPlayer_SetClip(&pr->weaponAnim, clip);
             // Don't loop reload animation, but loop all others
-            pr->weaponAnim.loop = (nextWeapon != PR_WEAPON_RELOAD);
+            // Also don't loop melee/shoot
+            bool loop = (nextWeapon != PR_WEAPON_RELOAD && nextWeapon != PR_WEAPON_SHOOT);
+             // Move/Idle loop. Shoot/Reload/Melee don't.
+             if (nextWeapon == PR_WEAPON_IDLE || nextWeapon == PR_WEAPON_MOVE) loop = true;
+             else loop = false;
+             
+            pr->weaponAnim.loop = loop;
         }
     }
 
     AnimPlayer_Update(&pr->weaponAnim, dt);
 }
 
-void PlayerRender_Draw(const PlayerRender *pr, const Entity *player) {
+void PlayerRender_Draw(const PlayerRender *pr, const Entity *player, PlayerEquipState currentEquip) {
     if (!pr || !pr->loaded || !player) return;
 
     Texture2D feetFrame = AnimPlayer_GetFrame(&pr->feetAnim);
     Texture2D weaponFrame = (Texture2D){0};
 
-    if (player->equipmentState != PLAYER_EQUIP_BARE_HANDS) {
+    if (currentEquip != PLAYER_EQUIP_BARE_HANDS) {
         weaponFrame = AnimPlayer_GetFrame(&pr->weaponAnim);
     }
 
@@ -324,15 +330,15 @@ void PlayerRender_Draw(const PlayerRender *pr, const Entity *player) {
 #define MUZZLE_OFFSET_X 40.0f
 #define MUZZLE_OFFSET_Y 16.0f
 
-void PlayerRender_DrawMuzzleFlash(const PlayerRender *pr, const Entity *player, float weaponShootTimer) {
+void PlayerRender_DrawMuzzleFlash(const PlayerRender *pr, const Entity *player, PlayerEquipState currentEquip, float weaponShootTimer) {
     if (!pr || !pr->loaded || !player) return;
     if (pr->muzzleFlash.id == 0) return;
     if (weaponShootTimer <= 0.0f) return;
     
     // Only show muzzle flash for guns
-    if (player->equipmentState != PLAYER_EQUIP_HANDGUN &&
-        player->equipmentState != PLAYER_EQUIP_RIFLE &&
-        player->equipmentState != PLAYER_EQUIP_SHOTGUN) {
+    if (currentEquip != PLAYER_EQUIP_HANDGUN &&
+        currentEquip != PLAYER_EQUIP_RIFLE &&
+        currentEquip != PLAYER_EQUIP_SHOTGUN) {
         return;
     }
     
