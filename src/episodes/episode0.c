@@ -7,6 +7,7 @@
 //   assets/map/prolog/epilog_map.png
 // We render it scaled up in-world (see EPILOG_WORLD_SCALE in game.c) to keep the
 // PNG sharp. So bounds are larger than the PNG's pixel size.
+// NOTE: These constants are reserved for future collision/boundary checking
 #define EPILOG_W 1024.0f
 #define EPILOG_H 1024.0f
 
