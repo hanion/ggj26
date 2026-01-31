@@ -23,4 +23,16 @@ void PlayerActions_HandleEnemyKilled(Level *level,
                                     DroppedGun *droppedGuns,
                                     int maxDroppedGuns);
 
+void PlayerActions_ApplyDamage(Level *level, 
+                               int enemyIndex, 
+                               float damage,
+                               Entity *player,
+                               Entity *droppedMasks,
+                               int maxMasks,
+                               float droppedMaskRadius,
+                               Entity *droppedCards,
+                               int maxCards,
+                               DroppedGun *droppedGuns,
+                               int maxDroppedGuns);
+
 #endif // PLAYER_ACTIONS_H

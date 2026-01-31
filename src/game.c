@@ -417,19 +417,8 @@ static void UpdateGame(float dt) {
             currentMask->isActive = false;
         }
     }
-
-    // Update Mask Timers
-    for(int i=0; i<3; i++) {
-        if (player.inventory.maskSlots[i].isActive) {
-             player.inventory.maskSlots[i].currentTimer -= dt;
-             if (player.inventory.maskSlots[i].currentTimer <= 0) {
-                 player.inventory.maskSlots[i].isActive = false;
-                 player.inventory.maskSlots[i].type = MASK_NONE; // Break
-             }
-        }
-    }
     
-    bool hasGunEquipped = (currentGun->type != GUN_NONE && currentGun->type != GUN_KNIFE);
+    bool hasGunEquipped = (currentGun->type != GUN_NONE);// && currentGun->type != GUN_KNIFE);
 
     // Player Update
     UpdatePlayer(&player, &currentLevel, dt, developerMode);
@@ -505,6 +494,7 @@ static void UpdateGame(float dt) {
                         bullets[i].lifeTime = BULLET_LIFETIME;
                         bullets[i].isPlayerOwned = true;
                         bullets[i].velocity = Vector2Scale(aimDirNormalized, BULLET_SPEED);
+                        bullets[i].damage = currentGun->damage; // Use gun damage stats
                         
                         currentGun->currentAmmo--;
                         weaponShootTimer = currentGun->cooldown;
@@ -531,24 +521,40 @@ static void UpdateGame(float dt) {
         }
     }
 
-    // 3. Melee Logic (Knife / Stealth Kill)
+    // 3. Melee Logic (Knife / Choke / Stealth Kill)
     meleeTargetIndex = -1;
-    if (currentGun->type == GUN_KNIFE || currentGun->type == GUN_NONE) {
-        meleeTargetIndex = PlayerActions_GetClosestEnemyInRange(&currentLevel, player.position, meleeRange);
-        if (meleeTargetIndex != -1 && IsKeyPressed(KEY_E)) {
-            PlayerActions_HandleEnemyKilled(&currentLevel,
-                                            meleeTargetIndex,
-                                            &player,
-                                            droppedMasks,
-                                            MAX_MASKS,
-                                            droppedMaskRadius,
-                                            droppedCards,
-                                            MAX_CARDS,
-                                            droppedGuns,
-                                            MAX_DROPPED_GUNS);
-            meleeTargetIndex = -1;
-        }
+    
+    // Check for Choke Target (Always check range for UI prompt)
+    int chokeTarget = PlayerActions_GetClosestEnemyInRange(&currentLevel, player.position, 80.0f); // Increased range from 40->80
+    if (chokeTarget != -1) {
+        meleeTargetIndex = chokeTarget; // Set for UI prompt usage
     }
+
+    // Choke Logic (Right Click)
+    if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
+         if (meleeTargetIndex != -1) {
+             // Choke Damage = 100
+             PlayerActions_ApplyDamage(&currentLevel, meleeTargetIndex, 100.0f, &player, droppedMasks, MAX_MASKS, droppedMaskRadius, droppedCards, MAX_CARDS, droppedGuns, MAX_DROPPED_GUNS);
+             // TODO: Play Choke Sound/Anim
+             // Don't reset meleeTargetIndex here immediately if we want to show feedback, but usually action is instant.
+         }
+    }
+    
+    // Knife Logic (Left Click if Knife is equipped)
+    if (currentGun->type == GUN_KNIFE && IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && weaponShootTimer <= 0) {
+         // Use the gun's range (should be 100.0f)
+         int knifeTarget = PlayerActions_GetClosestEnemyInRange(&currentLevel, player.position, currentGun->range);
+         if (knifeTarget != -1) {
+             // Knife Damage = 50
+             PlayerActions_ApplyDamage(&currentLevel, knifeTarget, currentGun->damage, &player, droppedMasks, MAX_MASKS, droppedMaskRadius, droppedCards, MAX_CARDS, droppedGuns, MAX_DROPPED_GUNS);
+             PlaySound(fxShoot); // Just using shoot sound for now
+         }
+         weaponShootTimer = currentGun->cooldown;
+    }
+    
+    // Legacy E key removal or remapping?
+    // User said "not E anymore" for choking.
+    // So removing E key logic block.
 
     // 4. Update Bullets
     for (int i = 0; i < MAX_BULLETS; i++) {
@@ -586,8 +592,19 @@ static void UpdateGame(float dt) {
             for (int e = 0; e < currentLevel.enemyCount; e++) {
                 if (currentLevel.enemies[e].active) {
                     if (CheckCollisionCircles(bullets[i].position, bullets[i].radius, currentLevel.enemies[e].position, currentLevel.enemies[e].radius)) {
-                        // Kill Enemy
-                        PlayerActions_HandleEnemyKilled(&currentLevel, e, &player, droppedMasks, MAX_MASKS, droppedMaskRadius, droppedCards, MAX_CARDS, droppedGuns, MAX_DROPPED_GUNS);
+                        // Kill Enemy -> DAMAGE
+                        PlayerActions_ApplyDamage(&currentLevel, 
+                                                e, 
+                                                bullets[i].damage, // Use Bullet Damage
+                                                &player, 
+                                                droppedMasks, 
+                                                MAX_MASKS, 
+                                                droppedMaskRadius, 
+                                                droppedCards, 
+                                                MAX_CARDS, 
+                                                droppedGuns, 
+                                                MAX_DROPPED_GUNS);
+                        
                         bullets[i].active = false;
                         break;
                     }
@@ -610,23 +627,47 @@ static void UpdateGame(float dt) {
         if (droppedMasks[i].active) {
             if (CheckCollisionCircles(player.position, player.radius, droppedMasks[i].position, droppedMasks[i].radius)) {
                 if (IsKeyPressed(KEY_SPACE)) {
-                   // Pickup logic: Put in CURRENT slot
-                    int slot = player.inventory.currentMaskIndex;
-                    // Map dropped identity to mask type/ability
-                    MaskAbilityType mType = MASK_SPEED; 
-                    if (droppedMasks[i].identity.permissionLevel == PERM_ADMIN) mType = MASK_ADMIN;
-                    // Simple mapping for now
-                    
-                    player.inventory.maskSlots[slot].type = mType;
-                    player.inventory.maskSlots[slot].maxDuration = 30.0f; // 30s duration?
-                    player.inventory.maskSlots[slot].currentTimer = 30.0f;
-                    player.inventory.maskSlots[slot].isActive = false; 
-                    player.inventory.maskSlots[slot].collected = true;
-                    player.inventory.maskSlots[slot].color = droppedMasks[i].identity.color;
-                    
-                    droppedMasks[i].active = false;
+                    // Pickup logic: Find empty slot
+                    int emptyIdx = -1;
+                    for (int s = 0; s < MAX_MASK_SLOTS; s++) {
+                        if (player.inventory.maskSlots[s].type == MASK_NONE) {
+                            emptyIdx = s;
+                            break;
+                        }
+                    }
+
+                    if (emptyIdx != -1) {
+                         // Map dropped identity to mask type
+                         MaskAbilityType mType = MASK_SPEED; 
+                         // Logic to determine type (random or based on enemy?)
+                         if (droppedMasks[i].identity.color.r > 200) mType = MASK_STEALTH; // Red = Stealth?
+                         
+                         player.inventory.maskSlots[emptyIdx].type = mType;
+                         player.inventory.maskSlots[emptyIdx].maxDuration = (mType == MASK_SPEED) ? 10.0f : 5.0f; 
+                         player.inventory.maskSlots[emptyIdx].currentTimer = player.inventory.maskSlots[emptyIdx].maxDuration;
+                         player.inventory.maskSlots[emptyIdx].isActive = false; 
+                         player.inventory.maskSlots[emptyIdx].collected = true;
+                         player.inventory.maskSlots[emptyIdx].color = droppedMasks[i].identity.color;
+                         
+                         droppedMasks[i].active = false;
+                         DrawText("MASK EQUIPPED!", (int)player.position.x - 20, (int)player.position.y - 60, 10, GREEN);
+                    } else {
+                         DrawText("INVENTORY FULL! DROP MASK (G + Num)", (int)player.position.x - 50, (int)player.position.y - 60, 10, RED);
+                    }
                 }
             }
+        }
+    }
+    
+    // Drop Mask (Vanish)
+    if (IsKeyPressed(KEY_G)) {
+        // Drops the currently active or selected mask slot
+        int currentMask = player.inventory.currentMaskIndex; // Use selected slot
+        if (player.inventory.maskSlots[currentMask].type != MASK_NONE) {
+             player.inventory.maskSlots[currentMask].type = MASK_NONE;
+             player.inventory.maskSlots[currentMask].isActive = false;
+             player.inventory.maskSlots[currentMask].collected = false;
+             // Vanish - no entity spawned
         }
     }
 
@@ -657,50 +698,41 @@ static void UpdateGame(float dt) {
             if (CheckCollisionCircles(player.position, player.radius, droppedGuns[i].position, droppedGuns[i].radius)) {
                 DrawText("PRESS SPACE TO PICKUP GUN", (int)player.position.x - 50, (int)player.position.y - 40, 10, PINK);
                 if (IsKeyPressed(KEY_SPACE)) {
-                    // Try to find empty slot
+                    // Try to find empty slot or a Knife slot to replace (SKIPPING SLOT 0)
                     int emptySlot = -1;
-                    for (int s=0; s<MAX_GUN_SLOTS; s++) {
-                        if (player.inventory.gunSlots[s].type == GUN_NONE) {
+                    for (int s=1; s<MAX_GUN_SLOTS; s++) { // Start from 1
+                        if (player.inventory.gunSlots[s].type == GUN_NONE || player.inventory.gunSlots[s].type == GUN_KNIFE) {
                             emptySlot = s;
                             break;
                         }
                     }
                     
                     if (emptySlot != -1) {
-                        // Take it
+                        // Take it (Overwriting Knife/None in slot 1 or 2)
                         player.inventory.gunSlots[emptySlot] = droppedGuns[i].gun;
                         player.inventory.currentGunIndex = emptySlot; // Auto-switch?
                         droppedGuns[i].active = false;
                         PlaySound(fxReload); // Sound cue
                     } else {
-                        // Swap with current
-                        Gun temp = player.inventory.gunSlots[player.inventory.currentGunIndex];
-                        
-                        // If current is None/Knife we might not want to swap if we logic'd emptySlot correctly above, 
-                        // but if we are "Full" with legit guns, we swap.
-                        // Wait, if current is Knife, is it a "Gun"? 
-                        // Our types says GUN_KNIFE. We usually don't drop knife.
-                        // So if we have Knife, we should just overwrite it if we treat it as a slot?
-                        // Or if we strictly follow 3 gun slots...
-                        // Let's assume we Swap.
-                        
-                        // We need to drop the current gun at player pos
-                        // But wait, we are inside the droppedGuns loop. 
-                        // We can just transform THIS dropped gun into the one we dropped?
-                        
-                        if (temp.type != GUN_NONE && temp.type != GUN_KNIFE) {
-                            player.inventory.gunSlots[player.inventory.currentGunIndex] = droppedGuns[i].gun;
-                            
-                            droppedGuns[i].gun = temp; // Swap data
-                            droppedGuns[i].position = player.position; // Move drop to feet
-                            // Keep active true
+                        // Swap with current if current is NOT Slot 0 and NOT a Knife
+                        if (player.inventory.currentGunIndex > 0) {
+                             Gun temp = player.inventory.gunSlots[player.inventory.currentGunIndex];
+                             
+                             if (temp.type != GUN_NONE && temp.type != GUN_KNIFE) {
+                                player.inventory.gunSlots[player.inventory.currentGunIndex] = droppedGuns[i].gun;
+                                
+                                droppedGuns[i].gun = temp; // Swap data
+                                droppedGuns[i].position = player.position; // Move drop to feet
+                             } else {
+                                 // Fallback (Shouldn't happen if emptySlot logic works)
+                                 player.inventory.gunSlots[player.inventory.currentGunIndex] = droppedGuns[i].gun;
+                                 droppedGuns[i].active = false;
+                             }
                         } else {
-                            // If holding Knife, just take logic should have handled it? 
-                            // If slots are full with non-knives, we end up here.
-                            // If we hold Knife and slots are full (e.g. 3 rifles in inventory but holding knife?), 
-                            // we swap into current index?
-                            player.inventory.gunSlots[player.inventory.currentGunIndex] = droppedGuns[i].gun;
-                            droppedGuns[i].active = false; // Just take, don't drop knife
+                             // Holding Knife (Slot 0) and Slots 1/2 are full.
+                             // Show UI "Inventory Full"? Or swap with Slot 1 by default?
+                             // User requirement implies Slot 0 is safe. We just don't pick up.
+                             DrawText("INVENTORY FULL - SWITCH WEAPON TO SWAP", (int)player.position.x - 60, (int)player.position.y - 50, 10, RED);
                         }
                     }
                 }
@@ -719,16 +751,19 @@ static void UpdateGame(float dt) {
                 if (!droppedGuns[i].active) {
                     droppedGuns[i].active = true;
                     droppedGuns[i].position = player.position;
-                    // Offset slightly forward?
-                    droppedGuns[i].position.x += 20 * player.identity.speed * dt * cosf(player.rotation * DEG2RAD); // Rough dir
+                    // Offset slightly forward
+                    droppedGuns[i].position.x += 20 * player.identity.speed * dt * cosf(player.rotation * DEG2RAD);
                     droppedGuns[i].position.y += 20 * player.identity.speed * dt * sinf(player.rotation * DEG2RAD);
                     
                     droppedGuns[i].radius = 15.0f;
                     droppedGuns[i].gun = current;
                     
-                    // Remove from inv
-                    player.inventory.gunSlots[idx].type = GUN_NONE;
-                    player.inventory.gunSlots[idx].active = false;
+                    // Revert slot to Knife
+                    player.inventory.gunSlots[idx].type = GUN_KNIFE;
+                    player.inventory.gunSlots[idx].active = true;
+                    player.inventory.gunSlots[idx].damage = 50.0f;
+                    player.inventory.gunSlots[idx].range = 100.0f;
+                    player.inventory.gunSlots[idx].cooldown = 0.5f;
                     
                     break;
                 }
@@ -896,15 +931,46 @@ static void DrawGame(void) {
 
                 DrawCircleV(currentLevel.enemies[i].position, currentLevel.enemies[i].radius, currentLevel.enemies[i].identity.color);
                 DrawCircleLines((int)currentLevel.enemies[i].position.x, (int)currentLevel.enemies[i].position.y, currentLevel.enemies[i].radius + 2, WHITE);
+                
+                // HP Bar
+                float hpRatio = currentLevel.enemies[i].health / currentLevel.enemies[i].maxHealth;
+                if (hpRatio < 0.0f) hpRatio = 0.0f;
+                int barW = 40;
+                int barH = 5;
+                int barX = (int)currentLevel.enemies[i].position.x - barW/2;
+                int barY = (int)currentLevel.enemies[i].position.y - 30;
+                
+                DrawRectangle(barX, barY, barW, barH, RED);
+                DrawRectangle(barX, barY, (int)(barW * hpRatio), barH, GREEN);
+                DrawRectangleLines(barX, barY, barW, barH, BLACK);
+                
+                // Text
+                DrawText(TextFormat("%.0f", currentLevel.enemies[i].health), barX, barY - 10, 10, WHITE);
             }
         }
 
         // Mask
         for (int i = 0; i < MAX_MASKS; i++) {
             if (droppedMasks[i].active) {
-                DrawCircleV(droppedMasks[i].position, droppedMasks[i].radius, droppedMasks[i].identity.color);
-                DrawText("MASK", (int)droppedMasks[i].position.x - 10, (int)droppedMasks[i].position.y - 10, 8, WHITE);
-                DrawText("PRESS SPACE", (int)droppedMasks[i].position.x - 30, (int)droppedMasks[i].position.y - 30, 10, WHITE);
+                // Draw Striped Pattern
+                Vector2 pos = droppedMasks[i].position;
+                float r = droppedMasks[i].radius;
+                Color col = droppedMasks[i].identity.color;
+                
+                DrawCircleV(pos, r, col);
+                DrawCircleLines((int)pos.x, (int)pos.y, r, WHITE);
+                
+                // Stripes (Diagonal)
+                rlPushMatrix();
+                rlTranslatef(pos.x, pos.y, 0);
+                rlRotatef(45.0f, 0, 0, 1);
+                DrawRectangle(-r, -r/2, r*2, 4, WHITE);
+                DrawRectangle(-r, 0, r*2, 4, WHITE);
+                DrawRectangle(-r, r/2, r*2, 4, WHITE);
+                rlPopMatrix();
+
+                DrawText("MASK", (int)pos.x - 10, (int)pos.y - 10, 8, BLACK);
+                DrawText("PRESS SPACE", (int)pos.x - 30, (int)pos.y - 30, 10, WHITE);
             }
         }
 
@@ -948,7 +1014,7 @@ static void DrawGame(void) {
 
         // Melee Prompt
         if (meleeTargetIndex >= 0 && meleeTargetIndex < currentLevel.enemyCount && currentLevel.enemies[meleeTargetIndex].active) {
-             DrawText("PRESS E TO CHOKE", (int)player.position.x, (int)player.position.y - 60, 12, WHITE);
+             DrawText("RIGHT CLICK TO CHOKE", (int)player.position.x - 50, (int)player.position.y - 60, 12, RED);
         }
         
         // Debug
@@ -959,6 +1025,31 @@ static void DrawGame(void) {
         EndMode2D();
     // HUD
     Hud_DrawPlayer(&player);
+
+    // UI: Active Mask Info
+    int activeMaskIdx = -1;
+    for(int i=0; i<3; i++) {
+        if(player.inventory.maskSlots[i].isActive) {
+             activeMaskIdx = i;
+             break;
+        }
+    }
+    
+    if (activeMaskIdx != -1) {
+        Mask m = player.inventory.maskSlots[activeMaskIdx];
+        const char *maskName = (m.type == MASK_SPEED) ? "Speed Mask" : (m.type == MASK_STEALTH ? "Stealth Mask" : "Unknown Mask");
+        const char *desc = (m.type == MASK_SPEED) ? "Ability: +50% Speed (10s)" : (m.type == MASK_STEALTH ? "Ability: Invisibility (5s)" : "Ability: None");
+        
+        DrawText(TextFormat("ACTIVE: %s (%.1fs)", maskName, m.currentTimer), GetScreenWidth()/2 - 150, 50, 24, GREEN);
+        DrawText(desc, GetScreenWidth()/2 - 150, 80, 20, WHITE);
+    } else {
+        // Show selected slot info if valid
+        Mask m = player.inventory.maskSlots[player.inventory.currentMaskIndex];
+        if (m.type != MASK_NONE) {
+             const char *maskName = (m.type == MASK_SPEED) ? "Speed Mask" : (m.type == MASK_STEALTH ? "Stealth Mask" : "Unknown Mask");
+             DrawText(TextFormat("SELECTED: %s [PRESS P TO ACTIVATE]", maskName), GetScreenWidth()/2 - 200, 50, 20, YELLOW);
+        }
+    }
 
     if (levelStartTimer > 0) {
         DrawText("READY...", GetScreenWidth()/2 - 50, GetScreenHeight()/2, 30, RED);
