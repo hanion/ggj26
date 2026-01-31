@@ -38,7 +38,8 @@ typedef enum {
   STATE_IDLE,
   STATE_PATROL,
   STATE_ATTACK,
-  STATE_SEARCH
+  STATE_SEARCH,
+  STATE_BEING_CHOKED
 } EnemyState;
 
 // --- GUN SYSTEM ---

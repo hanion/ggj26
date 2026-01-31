@@ -1,6 +1,5 @@
 // Standard
 #include <math.h>
-#include <stdio.h>
 
 // External
 #include "../raylib/src/raylib.h"
@@ -13,11 +12,9 @@
 #include "game_context.h"
 #include "entity.h"
 #include "levels.h"
-#include "anim.h"
 #include "gameplay_helpers.h"
 
 // Game Modules
-#include "episodes/episodes.h"
 #include "enemies/enemy.h"
 #include "player/player.h"
 #include "player/player_actions.h"
@@ -397,6 +394,17 @@ static void UpdateGame(float dt) {
     if (IsKeyPressed(KEY_TWO)) player.inventory.currentGunIndex = 1;
     if (IsKeyPressed(KEY_THREE)) player.inventory.currentGunIndex = 2;
 
+    float wheelMove = GetMouseWheelMove();
+    if (wheelMove != 0.0f) {
+        if (wheelMove > 0) {
+            player.inventory.currentGunIndex--;
+            if (player.inventory.currentGunIndex < 0) player.inventory.currentGunIndex = 2;
+        } else {
+            player.inventory.currentGunIndex++;
+            if (player.inventory.currentGunIndex > 2) player.inventory.currentGunIndex = 0;
+        }
+    }
+
     // Mask Switching
     if (IsKeyPressed(KEY_FOUR)) player.inventory.currentMaskIndex = 0;
     if (IsKeyPressed(KEY_FIVE)) player.inventory.currentMaskIndex = 1;
@@ -530,14 +538,55 @@ static void UpdateGame(float dt) {
         meleeTargetIndex = chokeTarget; // Set for UI prompt usage
     }
 
-    // Choke Logic (Right Click)
-    if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
-         if (meleeTargetIndex != -1) {
-             // Choke Damage = 100
-             PlayerActions_ApplyDamage(&currentLevel, meleeTargetIndex, 100.0f, &player, droppedMasks, MAX_MASKS, droppedMaskRadius, droppedCards, MAX_CARDS, droppedGuns, MAX_DROPPED_GUNS);
-             // TODO: Play Choke Sound/Anim
-             // Don't reset meleeTargetIndex here immediately if we want to show feedback, but usually action is instant.
+    // Choke Logic (Hold E)
+    if (IsKeyDown(KEY_E)) {
+         if (!player.isChoking) {
+             // START CHOKING
+             // 1. Find target
+             int potentialTarget = PlayerActions_GetClosestEnemyInRange(&currentLevel, player.position, 80.0f);
+             if (potentialTarget != -1) {
+                 Entity *tgt = &currentLevel.enemies[potentialTarget];
+                 // 2. Check visibility (Stealth)
+                 bool seen = CheckLineOfSight(tgt, player.position, &currentLevel);
+                 if (!seen && tgt->active) {
+                     // 3. Start Choke
+                     player.isChoking = true;
+                     player.chokeTargetIndex = potentialTarget;
+                     player.chokeTimer = 0.0f;
+                     tgt->state = STATE_BEING_CHOKED;
+                 }
+             }
+         } else {
+             // CONTINUE CHOKING
+             Entity *tgt = &currentLevel.enemies[player.chokeTargetIndex];
+             if (tgt->active && tgt->state == STATE_BEING_CHOKED) {
+                 player.chokeTimer += dt;
+                 
+                 // Lock positions (optional, or just disable movement inputs)
+                 // Note: Input handling below should respect isChoking flag to disable movement.
+                 
+                 if (player.chokeTimer >= 1.0f) {
+                     // KILL
+                     PlayerActions_ApplyDamage(&currentLevel, player.chokeTargetIndex, 1000.0f, &player, droppedMasks, MAX_MASKS, droppedMaskRadius, droppedCards, MAX_CARDS, droppedGuns, MAX_DROPPED_GUNS);
+                     player.isChoking = false;
+                     // tgt state handled by ApplyDamage (likely inactive)
+                 }
+             } else {
+                 // Target died or invalid
+                 player.isChoking = false;
+             }
          }
+    } else {
+        // RELEASED E
+        if (player.isChoking) {
+            // Cancel Choke
+             Entity *tgt = &currentLevel.enemies[player.chokeTargetIndex];
+             if (tgt->active && tgt->state == STATE_BEING_CHOKED) {
+                 tgt->state = STATE_ATTACK; // Alerted!
+             }
+             player.isChoking = false;
+             player.chokeTimer = 0.0f;
+        }
     }
     
     // Knife Logic (Left Click if Knife is equipped)
@@ -1014,7 +1063,27 @@ static void DrawGame(void) {
 
         // Melee Prompt
         if (meleeTargetIndex >= 0 && meleeTargetIndex < currentLevel.enemyCount && currentLevel.enemies[meleeTargetIndex].active) {
-             DrawText("RIGHT CLICK TO CHOKE", (int)player.position.x - 50, (int)player.position.y - 60, 12, RED);
+             DrawText("HOLD E TO CHOKE", (int)player.position.x - 40, (int)player.position.y - 60, 12, RED);
+        }
+
+        // Choking UI
+        if (player.isChoking) {
+             Vector2 center = player.position;
+             float radius = 45.0f; 
+             float progress = player.chokeTimer / 1.0f; 
+             
+             // Background
+             DrawCircleLines((int)center.x, (int)center.y, radius, Fade(DARKGRAY, 0.8f));
+             
+             // Progress
+             DrawCircleSector(center, radius, 0, 360 * progress, 36, Fade(RED, 0.7f));
+             
+             // Ring
+             // DrawRing(center, innerRadius, outerRadius, startAngle, endAngle, segments, color);
+             // DrawRing(center, innerRadius, outerRadius, startAngle, endAngle, segments, color);
+             DrawRing(center, radius - 2, radius + 2, 0, 360 * progress, 36, RED);
+
+             DrawText("CHOKING...", (int)center.x - 30, (int)center.y - 80, 10, RED);
         }
         
         // Debug
