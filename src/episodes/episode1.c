@@ -105,7 +105,7 @@ void InitEpisode1(Level *level) {
   // They share the boundary Y=654.
   // Wall at Y=654, check door.
   level->walls[level->wallCount++] = (Rectangle){1824, 654, 300, 20}; // Left part (Thinner)
-  level->walls[level->wallCount++] = (Rectangle){2244, 654, 500, 20}; // Right part (Gap 120 at 2124)
+  level->walls[level->wallCount++] = (Rectangle){2244, 654, 537, 20}; // Right part (Gap 120 at 2124)
 
   // Block Z6 Top (Y=654) ?? 
   // Z6 is (162, 654). Z1 is above it (0..913, 0..642).
@@ -131,6 +131,10 @@ void InitEpisode1(Level *level) {
   // Wall at 957.
   level->walls[level->wallCount++] = (Rectangle){957, 654, 20, 260};
   level->walls[level->wallCount++] = (Rectangle){957, 1034, 20, 300};
+  // Fix Gap Z6 Right (Below Z5, above Z7)
+  // Z5 ends at 1303. Z6 ends at 1507. D5 ends at 1334.
+  // Need wall from 1334 to 1507.
+  level->walls[level->wallCount++] = (Rectangle){957, 1334, 20, 173};
 
   // D6: Z6 -> Z7 (Y=1507).
   // Z6 Bottom is 654+853 = 1507.
