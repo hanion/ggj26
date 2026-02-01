@@ -17,4 +17,7 @@ void UnloadEpisode2();
 void InitEpisode3(Level *level);
 void UnloadEpisode3();
 
+void InitEpisode4(Level *level);
+void UnloadEpisode4();
+
 #endif // EPISODES_H

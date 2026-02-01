@@ -30,6 +30,9 @@ void InitLevel(int episode, Level *level) {
   case 3:
     InitEpisode3(level);
     break;
+  case 4:
+    InitEpisode4(level);
+    break;
   default:
     TraceLog(LOG_WARNING, "Episode %d not found!", episode);
     break;
@@ -41,5 +44,7 @@ void UnloadLevel(int episode) {
   case 0: UnloadProlog(); break;
   case 1: UnloadEpisode1(); break;
   case 2: UnloadEpisode2(); break;
+  case 3: UnloadEpisode3(); break;
+  case 4: UnloadEpisode4(); break;
   }
 }
