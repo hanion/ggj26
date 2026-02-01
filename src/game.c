@@ -1223,7 +1223,7 @@ static void DrawGame(void) {
     }
     }
 
-	level_editor_draw(&editor, camera);
+	level_editor_draw(&editor, &camera);
     EndDrawing();
 }
 

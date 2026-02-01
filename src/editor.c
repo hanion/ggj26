@@ -12,6 +12,9 @@ typedef enum {
 
     ED_MOVE_BG,
     ED_SCALE_BG,
+
+    ED_MOVE_DOOR,
+    ED_SCALE_DOOR,
 } EditorState;
 
 
@@ -39,6 +42,19 @@ LevelEditor LevelEditor_new(Level* level) {
 
 
 void editor_pick(LevelEditor* ed) {
+    for (int i = 0; i < ed->level->doorCount; i++) {
+        Rectangle *r = &ed->level->doors[i].rect;
+        if (CheckCollisionPointRec(ed->mouse_world, *r)) {
+            ed->state = ED_MOVE_DOOR;
+            ed->selected = i;
+            ed->drag_offset = (Vector2){
+                ed->mouse_world.x - r->x,
+                ed->mouse_world.y - r->y
+            };
+            return;
+        }
+    }
+
     for (int i = 0; i < ed->level->wallCount; i++) {
         Rectangle *r = &ed->level->walls[i];
         if (CheckCollisionPointRec(ed->mouse_world, *r)) {
@@ -71,13 +87,7 @@ void editor_pick(LevelEditor* ed) {
 
 
 void editor_update_state(LevelEditor* ed) {
-    if (IsKeyPressed(KEY_O)) {
-        ed->state = (ed->state == ED_CLOSED) ? ED_IDLE : ED_CLOSED;
-        ed->selected = -1;
-    }
-    if (ed->state == ED_CLOSED) {
-        return;
-    }
+    if (ed->state == ED_CLOSED) return;
 
     if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
         ed->state = ED_IDLE;
@@ -96,50 +106,39 @@ void editor_update_state(LevelEditor* ed) {
 }
 
 
-void editor_update(LevelEditor* ed) {
+void editor_update(LevelEditor* ed, Camera2D* camera) {
+    if (ed->state == ED_CLOSED) return;
+
+
+    float mouse_wheel = GetMouseWheelMove();
+    camera->zoom += mouse_wheel;
+
+
+    Rectangle* target_rect = NULL;
     switch (ed->state) {
+        case ED_MOVE_WALL:
+        case ED_SCALE_WALL:   target_rect = &ed->level->walls[ed->selected]; break;
+        case ED_MOVE_BG:
+        case ED_SCALE_BG:     target_rect = &ed->level->bgs[ed->selected].dest; break;
+        case ED_MOVE_DOOR:
+        case ED_SCALE_DOOR:   target_rect = &ed->level->doors[ed->selected].rect; break;
+        default: return;
+    }
 
-        case ED_MOVE_WALL: {
-            if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
-                Rectangle *r = &ed->level->walls[ed->selected];
-                r->x = ed->mouse_world.x - ed->drag_offset.x;
-                r->y = ed->mouse_world.y - ed->drag_offset.y;
-            }
-        } break;
-
-        case ED_SCALE_WALL: {
-            Rectangle *r = &ed->level->walls[ed->selected];
+    if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
+        if (ed->state == ED_MOVE_WALL || ed->state == ED_MOVE_BG || ed->state == ED_MOVE_DOOR) {
+            target_rect->x = ed->mouse_world.x - ed->drag_offset.x;
+            target_rect->y = ed->mouse_world.y - ed->drag_offset.y;
+        } else if (ed->state == ED_SCALE_WALL || ed->state == ED_SCALE_BG || ed->state == ED_SCALE_DOOR) {
             float step = ed->scale_step;
             if (IsKeyDown(KEY_LEFT_SHIFT)) step *= 4.0f;
             if (IsKeyDown(KEY_LEFT_ALT))   step *= 0.25f;
 
-            if (IsKeyDown(KEY_RIGHT)) r->width  += step;
-            if (IsKeyDown(KEY_LEFT))  r->width  -= step;
-            if (IsKeyDown(KEY_DOWN))  r->height += step;
-            if (IsKeyDown(KEY_UP))    r->height -= step;
-        } break;
-
-        case ED_MOVE_BG: {
-            if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
-                Background *b = &ed->level->bgs[ed->selected];
-                b->dest.x = ed->mouse_world.x - ed->drag_offset.x;
-                b->dest.y = ed->mouse_world.y - ed->drag_offset.y;
-            }
-        } break;
-
-        case ED_SCALE_BG: {
-            Background *b = &ed->level->bgs[ed->selected];
-            float step = ed->scale_step;
-            if (IsKeyDown(KEY_LEFT_SHIFT)) step *= 4.0f;
-            if (IsKeyDown(KEY_LEFT_ALT))   step *= 0.25f;
-
-            if (IsKeyDown(KEY_RIGHT)) b->dest.width  += step;
-            if (IsKeyDown(KEY_LEFT))  b->dest.width  -= step;
-            if (IsKeyDown(KEY_DOWN))  b->dest.height += step;
-            if (IsKeyDown(KEY_UP))    b->dest.height -= step;
-        } break;
-
-        default: break;
+            if (IsKeyDown(KEY_RIGHT)) target_rect->width  += step;
+            if (IsKeyDown(KEY_LEFT))  target_rect->width  -= step;
+            if (IsKeyDown(KEY_DOWN))  target_rect->height += step;
+            if (IsKeyDown(KEY_UP))    target_rect->height -= step;
+        }
     }
 }
 
@@ -174,58 +173,54 @@ void level_editor_export(LevelEditor* ed) {
 
 
 
-void level_editor_draw(LevelEditor* ed, Camera2D camera) {
+void level_editor_draw(LevelEditor* ed, Camera2D* camera) {
     if (!ed || !ed->level) return;
 
-    ed->mouse_world = GetScreenToWorld2D(GetMousePosition(), camera);
-
-    BeginMode2D(camera);
-
-    if (ed->state != ED_CLOSED) {
-        if (IsKeyPressed(KEY_I)) {
-            level_editor_export(ed);
-        }
-
-        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-            editor_pick(ed);
-        }
-
-
-        // draw wall
-        for (int i = 0; i < ed->level->wallCount; i++) {
-            DrawRectangleRec(ed->level->walls[i], DARKGRAY);
-
-            if ((ed->state == ED_MOVE_WALL || ed->state == ED_SCALE_WALL) &&
-                i == ed->selected) {
-                DrawRectangleLinesEx(ed->level->walls[i], 2, RED);
-            }
-        }
-
-        // draw bg
-        for (int i = 0; i < ed->level->bgs_count; i++) {
-            if ((ed->state == ED_MOVE_BG || ed->state == ED_SCALE_BG) &&
-                i == ed->selected) {
-                DrawRectangleLinesEx(ed->level->bgs[i].dest, 2, RED);
-            }
-        }
+    if (IsKeyPressed(KEY_O)) {
+        ed->state = (ed->state == ED_CLOSED) ? ED_IDLE : ED_CLOSED;
+        ed->selected = -1;
     }
 
+    if (ed->state == ED_CLOSED)  return;
 
+
+    ed->mouse_world = GetScreenToWorld2D(GetMousePosition(), *camera);
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        editor_pick(ed);
+    }
     editor_update_state(ed);
-    editor_update(ed);
+    editor_update(ed, camera);
 
-    EndMode2D();
-
-    if (ed->state != ED_CLOSED) {
-        DrawText(
-            TextFormat(
-                "EDITOR | state: %d | selected: %d",
-                ed->state,
-                ed->selected
-            ),
-            10, 800, 20, YELLOW
-        );
+    if (IsKeyPressed(KEY_I)) {
+        level_editor_export(ed);
     }
+
+    BeginMode2D(*camera);
+    // draw wall
+    for (int i = 0; i < ed->level->wallCount; i++) {
+        DrawRectangleRec(ed->level->walls[i], DARKGRAY);
+
+        if ((ed->state == ED_MOVE_WALL || ed->state == ED_SCALE_WALL) &&
+            i == ed->selected) {
+            DrawRectangleLinesEx(ed->level->walls[i], 2, RED);
+        }
+    }
+    // draw bg
+    for (int i = 0; i < ed->level->bgs_count; i++) {
+        if ((ed->state == ED_MOVE_BG || ed->state == ED_SCALE_BG) &&
+            i == ed->selected) {
+            DrawRectangleLinesEx(ed->level->bgs[i].dest, 2, RED);
+        }
+    }
+    EndMode2D();
+    DrawText(
+        TextFormat(
+            "EDITOR | state: %d | selected: %d",
+            ed->state,
+            ed->selected
+        ),
+        10, 800, 20, YELLOW
+    );
 }
 
 
