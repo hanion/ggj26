@@ -330,7 +330,7 @@ void level_editor_export(LevelEditor* ed) {
     for (int i = 0; i < level->enemyCount; i++) {
         Entity *e = &level->enemies[i];
 
-        printf("Identity enemy_id_%d = {.permissionLevel = PERM_ADMIN, .color = PURPLE, .speed = 250.0f};\n", i);
+        printf("Identity enemy_id_%d = {.permissionLevel = %d, .color = PURPLE, .speed = 250.0f};\n", i, e->type);
         printf("level->enemies[%d] = InitEnemy((Vector2){%f,%f}, %s);\n",
             i, e->position.x, e->position.y, EnemyType_cstr(e->type)
         );
