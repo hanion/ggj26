@@ -4,6 +4,9 @@
 #include "../levels.h"
 
 // Episode Initializers
+void InitProlog(Level *level);
+void UnloadProlog();
+
 // Episode Initializers
 void InitEpisode1(Level *level);
 void UnloadEpisode1();

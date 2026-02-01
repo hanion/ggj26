@@ -112,6 +112,7 @@ static Rectangle btnEpisode2;
 static Rectangle btnQuit;
 static Rectangle btnPlay;
 static Rectangle btnContinue;
+static Rectangle btnProlog; // Dev-only
 
 // Helper function to simulate DrawTextureTiled
 void DrawTextureTiled(Texture2D texture, Rectangle source, Rectangle dest, Vector2 origin, float rotation, float scale, Color tint) {
@@ -236,26 +237,27 @@ void EndLevel(int id) {
 
 void Game_Init(void) {
     currentState = STATE_MENU;
-    
-    // Start a fresh story by default.
     GameContext_Init(&gameCtx);
-
     Hud_Init();
 
-    // Define Menu Buttons (Centered)
     int sw = GetScreenWidth();
     int sh = GetScreenHeight();
     int btnWidth = 200;
     int btnHeight = 50;
     int startY = sh / 2 - 50;
 
-    btnEpisode1 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY, (float)btnWidth, (float)btnHeight };
-    btnEpisode2 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 70, (float)btnWidth, (float)btnHeight };
+#if !defined(DEV_MODE) || !(DEV_MODE)
+    // Player mode: New Game + Continue + Quit
+    btnPlay = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY, (float)btnWidth, (float)btnHeight };
+    btnContinue = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 70, (float)btnWidth, (float)btnHeight };
     btnQuit     = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 140, (float)btnWidth, (float)btnHeight };
-    
-    // Player-facing menu buttons reuse the same layout slots.
-    btnPlay     = btnEpisode1;
-    btnContinue = btnEpisode2;
+#else
+    // Dev mode: choose episode directly
+    btnProlog   = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY, (float)btnWidth, (float)btnHeight };
+    btnEpisode1 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 70, (float)btnWidth, (float)btnHeight };
+    btnEpisode2 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 140, (float)btnWidth, (float)btnHeight };
+    btnQuit     = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 210, (float)btnWidth, (float)btnHeight };
+#endif
 }
 
 // Helper for HighDPI Mouse Scaling
@@ -275,13 +277,28 @@ static bool UpdateMenu(void) {
     Vector2 mousePos = GetScaledMousePosition();
 
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-        if (CheckCollisionPointRec(mousePos, btnEpisode1)) {
+#if !defined(DEV_MODE) || !(DEV_MODE)
+        // Player mode
+        if (CheckCollisionPointRec(mousePos, btnPlay)) {
+            GameContext_Init(&gameCtx);
+            StartLevel(0); // Prolog
+        } else if (gameCtx.hasProgress && CheckCollisionPointRec(mousePos, btnContinue)) {
+            StartLevel(gameCtx.nextEpisodeId);
+        } else if (CheckCollisionPointRec(mousePos, btnQuit)) {
+            return false;
+        }
+#else
+        // Dev mode: choose any episode
+        if (CheckCollisionPointRec(mousePos, btnProlog)) {
+            StartLevel(0);
+        } else if (CheckCollisionPointRec(mousePos, btnEpisode1)) {
             StartLevel(1);
         } else if (CheckCollisionPointRec(mousePos, btnEpisode2)) {
             StartLevel(2);
         } else if (CheckCollisionPointRec(mousePos, btnQuit)) {
             return false;
         }
+#endif
     }
     return true;
 }
@@ -291,27 +308,39 @@ static void DrawMenu(void) {
     ClearBackground((Color){20, 20, 25, 255});
 
     int sw = GetScreenWidth();
-    int btnWidth = 200;
-
-    DrawText("GGJ26 - MASK INFILTRATION", sw/2 - 200, 100, 30, RAYWHITE);
-
-    // Buttons
     Color hoverColor = (Color){50, 50, 60, 255};
     Color normalColor = GRAY;
     Vector2 mousePos = GetScaledMousePosition();
 
-    // Episode 1
-    DrawRectangleRec(btnEpisode1, CheckCollisionPointRec(mousePos, btnEpisode1) ? hoverColor : normalColor);
-    DrawText("EPISODE 1", btnEpisode1.x + 40, btnEpisode1.y + 15, 20, WHITE);
+    DrawText("GGJ26 - MASK INFILTRATION", sw/2 - 200, 100, 30, RAYWHITE);
 
-    // Episode 2
-    DrawRectangleRec(btnEpisode2, CheckCollisionPointRec(mousePos, btnEpisode2) ? hoverColor : normalColor);
-    DrawText("EPISODE 2", btnEpisode2.x + 40, btnEpisode2.y + 15, 20, WHITE);
+#if !defined(DEV_MODE) || !(DEV_MODE)
+    // Player menu
+    DrawRectangleRec(btnPlay, CheckCollisionPointRec(mousePos, btnPlay) ? hoverColor : normalColor);
+    DrawText("NEW GAME", btnPlay.x + 55, btnPlay.y + 15, 20, WHITE);
 
-    // Quit
+    if (gameCtx.hasProgress) {
+        DrawRectangleRec(btnContinue, CheckCollisionPointRec(mousePos, btnContinue) ? hoverColor : normalColor);
+        DrawText("CONTINUE", btnContinue.x + 50, btnContinue.y + 15, 20, WHITE);
+    }
+
     DrawRectangleRec(btnQuit, CheckCollisionPointRec(mousePos, btnQuit) ? hoverColor : normalColor);
     DrawText("QUIT", btnQuit.x + 75, btnQuit.y + 15, 20, WHITE);
-    
+#else
+    // Dev menu
+    DrawRectangleRec(btnProlog, CheckCollisionPointRec(mousePos, btnProlog) ? hoverColor : normalColor);
+    DrawText("PROLOG", btnProlog.x + 65, btnProlog.y + 15, 20, WHITE);
+
+    DrawRectangleRec(btnEpisode1, CheckCollisionPointRec(mousePos, btnEpisode1) ? hoverColor : normalColor);
+    DrawText("EPISODE 1", btnEpisode1.x + 45, btnEpisode1.y + 15, 20, WHITE);
+
+    DrawRectangleRec(btnEpisode2, CheckCollisionPointRec(mousePos, btnEpisode2) ? hoverColor : normalColor);
+    DrawText("EPISODE 2", btnEpisode2.x + 45, btnEpisode2.y + 15, 20, WHITE);
+
+    DrawRectangleRec(btnQuit, CheckCollisionPointRec(mousePos, btnQuit) ? hoverColor : normalColor);
+    DrawText("QUIT", btnQuit.x + 75, btnQuit.y + 15, 20, WHITE);
+#endif
+
     EndDrawing();
 }
 
@@ -399,11 +428,12 @@ static void UpdateGame(float dt) {
 
         // WIN
         if (gameWon) {
-            // Update progress context (used by Continue / Next).
             gameCtx.hasWonLastEpisode = true;
             GameContext_SaveFromPlayer(&gameCtx, &player);
-            if (currentLevel.id == 1) {
-                gameCtx.nextEpisodeId = 2;
+            if (currentLevel.id == 0) {
+                gameCtx.nextEpisodeId = 1; // Prolog -> Episode 1
+            } else if (currentLevel.id == 1) {
+                gameCtx.nextEpisodeId = 2; // Episode 1 -> Episode 2
             }
 
             // Player builds: Next or Menu.
@@ -908,7 +938,11 @@ static void UpdateGame(float dt) {
 
     // Check Win Condition (Reach Win Area or Enemies Cleared? or Zone 7?)
     // For Episode 1, let's say reach Zone 7 bottom? 
-    if (player.position.y > 2000.0f) {
+    if (currentLevel.id == 0) {
+        if (player.position.y > 1000.0f) { // Example win condition for prolog
+            gameWon = true;
+        }
+    } else if (player.position.y > 2000.0f) {
         gameWon = true;
     }
 

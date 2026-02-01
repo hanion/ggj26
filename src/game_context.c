@@ -3,7 +3,7 @@
 void GameContext_Init(GameContext *ctx) {
     if (!ctx) return;
     *ctx = (GameContext){0};
-    ctx->nextEpisodeId = 1;
+    ctx->nextEpisodeId = 0;
     ctx->player.valid = false;
 }
 
