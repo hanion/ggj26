@@ -89,6 +89,6 @@ void PlayerRender_OnEquip(PlayerRender *pr, PlayerEquipState equip);
 void PlayerRender_Draw(const PlayerRender *pr, const Entity *player, PlayerEquipState currentEquip);
 
 // Draw muzzle flash when shooting
-void PlayerRender_DrawMuzzleFlash(const PlayerRender *pr, const Entity *player, PlayerEquipState currentEquip, float weaponShootTimer);
+void PlayerRender_DrawMuzzleFlash(const PlayerRender *pr, const Entity *player, PlayerEquipState currentEquip, float weaponShootTimer, float weaponCooldown);
 
 #endif
