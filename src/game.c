@@ -1001,6 +1001,8 @@ static void DrawGame(void) {
         }
 
         // Draw Level Elements
+        // NOTE: Walls are invisible by default (Collision Only). 
+        // They are only drawn if Debug Draw is enabled (Press F1).
         if (playerDebugDraw) {
             for (int i = 0; i < currentLevel.wallCount; i++) DrawRectangleRec(currentLevel.walls[i], Fade(RED, 0.5f));
         }
