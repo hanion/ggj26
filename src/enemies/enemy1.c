@@ -59,13 +59,38 @@ bool CheckLineOfSight(Entity *enemy, Vector2 target, Level *level) {
     if (fabsf(angleDiff) > enemy->sightAngle / 2.0f) return false;
 
     // 3. Wall Check (Segment Intersection)
+    // IMPORTANT: CheckCollisionSegmentRec relies on AABB. 
+    // We need to implement rotated segment check or CheckCollisionRay w/ OBB.
+    // For now, let's keep using segment vs AABB of the rotated rect? No that's wrong.
+    // Let's use Gameplay_GetRayHit which deals with OBB correctly now.
+    
+    // Instead of custom loop, let's assume we can check if ray hits wall closer than target.
+    // CheckCollisionLines used in GetRayHit logic.
+    Vector2 hit = Gameplay_GetRayHit(enemy->position, target, level);
+    // If hit point is closer than target (with epsilon), then blocked.
+    // Wait, GetRayHit checks walls AND doors.
+    // But we need to distinguish walls (opaque) vs doors (transparent/opaque?).
+    // Doors are opaque if closed.
+    
+    // Let's just check Gameplay_GetRayHit. If it returns something < dist, blocked.
+    // But GetRayHit returns 'end' if no hit.
+    // If distance(start, hit) < distance(start, target) - epsilon -> Blocked.
+    if (Vector2DistanceSqr(enemy->position, hit) < Vector2DistanceSqr(enemy->position, target) - 1.0f) {
+        return false;
+    }
+    
+    /*
     for (int i = 0; i < level->wallCount; i++) {
         if (CheckCollisionSegmentRec(enemy->position, target, level->walls[i])) {
             return false;
         }
     }
+    */
     
+    /*
     // Check Doors (Closed ones check)
+    // Handled by Gameplay_GetRayHit in previous block automatically?
+    // GetRayHit checks doors too.
     for (int i = 0; i < level->doorCount; i++) {
         // If door is closed, it blocks sight
         if (!level->doors[i].isOpen) {
@@ -74,6 +99,7 @@ bool CheckLineOfSight(Entity *enemy, Vector2 target, Level *level) {
             }
         }
     }
+    */
 
     return true;
 }
@@ -88,7 +114,7 @@ static bool MoveEnemyWithCollision(Entity *enemy, Vector2 delta, const Level *le
     bool blocked_x = false;
 
     for (int i = 0; i < level->wallCount; i++) {
-        if (CheckCollisionCircleRec(enemy->position, enemy->radius, level->walls[i])) {
+        if (CheckCollisionCircleRotatedRect(enemy->position, enemy->radius, level->walls[i].rect, level->walls[i].rotation)) {
             blocked_x = true;
             break;
         }
@@ -111,7 +137,7 @@ static bool MoveEnemyWithCollision(Entity *enemy, Vector2 delta, const Level *le
     bool blocked_y = false;
 
     for (int i = 0; i < level->wallCount; i++) {
-        if (CheckCollisionCircleRec(enemy->position, enemy->radius, level->walls[i])) {
+        if (CheckCollisionCircleRotatedRect(enemy->position, enemy->radius, level->walls[i].rect, level->walls[i].rotation)) {
             blocked_y = true;
             break;
         }

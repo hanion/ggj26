@@ -111,6 +111,7 @@ static float playerDebugCrossSize = 10.0f;
 // Menu Buttons
 static Rectangle btnEpisode1;
 static Rectangle btnEpisode2;
+static Rectangle btnEpisode3;
 static Rectangle btnQuit;
 static Rectangle btnPlay;
 static Rectangle btnContinue;
@@ -258,7 +259,8 @@ void Game_Init(void) {
     btnProlog   = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY, (float)btnWidth, (float)btnHeight };
     btnEpisode1 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 70, (float)btnWidth, (float)btnHeight };
     btnEpisode2 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 140, (float)btnWidth, (float)btnHeight };
-    btnQuit     = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 210, (float)btnWidth, (float)btnHeight };
+    btnEpisode3 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 210, (float)btnWidth, (float)btnHeight };
+    btnQuit     = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 280, (float)btnWidth, (float)btnHeight };
 #endif
 }
 
@@ -297,6 +299,8 @@ static bool UpdateMenu(void) {
             StartLevel(1);
         } else if (CheckCollisionPointRec(mousePos, btnEpisode2)) {
             StartLevel(2);
+        } else if (CheckCollisionPointRec(mousePos, btnEpisode3)) {
+            StartLevel(3);
         } else if (CheckCollisionPointRec(mousePos, btnQuit)) {
             return false;
         }
@@ -338,6 +342,9 @@ static void DrawMenu(void) {
 
     DrawRectangleRec(btnEpisode2, CheckCollisionPointRec(mousePos, btnEpisode2) ? hoverColor : normalColor);
     DrawText("EPISODE 2", btnEpisode2.x + 45, btnEpisode2.y + 15, 20, WHITE);
+
+    DrawRectangleRec(btnEpisode3, CheckCollisionPointRec(mousePos, btnEpisode3) ? hoverColor : normalColor);
+    DrawText("EPISODE 3", btnEpisode3.x + 45, btnEpisode3.y + 15, 20, WHITE);
 
     DrawRectangleRec(btnQuit, CheckCollisionPointRec(mousePos, btnQuit) ? hoverColor : normalColor);
     DrawText("QUIT", btnQuit.x + 75, btnQuit.y + 15, 20, WHITE);
@@ -731,7 +738,7 @@ static void UpdateGame(float dt) {
         bool hit = false;
         // Wall Collision
         for (int w = 0; w < currentLevel.wallCount; w++) {
-            if (CheckCollisionCircleRec(bullets[i].position, bullets[i].radius, currentLevel.walls[w])) {
+            if (CheckCollisionCircleRotatedRect(bullets[i].position, bullets[i].radius, currentLevel.walls[w].rect, currentLevel.walls[w].rotation)) {
                 hit = true; break;
             }
         }
@@ -1008,7 +1015,16 @@ static void DrawGame(void) {
         // NOTE: Walls are invisible by default (Collision Only). 
         // They are only drawn if Debug Draw is enabled (Press F1).
         if (playerDebugDraw) {
-            for (int i = 0; i < currentLevel.wallCount; i++) DrawRectangleRec(currentLevel.walls[i], Fade(RED, 0.5f));
+            for (int i = 0; i < currentLevel.wallCount; i++) {
+                Wall w = currentLevel.walls[i];
+                Vector2 center = { w.rect.x + w.rect.width/2.0f, w.rect.y + w.rect.height/2.0f };
+                DrawRectanglePro(
+                    (Rectangle){center.x, center.y, w.rect.width, w.rect.height}, 
+                    (Vector2){w.rect.width/2.0f, w.rect.height/2.0f}, 
+                    w.rotation, 
+                    Fade(RED, 0.5f)
+                );
+            }
         }
         
         // Draw Doors (Sliding Sci-Fi Style)

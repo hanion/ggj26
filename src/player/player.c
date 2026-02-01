@@ -1,6 +1,7 @@
 #include "player.h"
 #include "../../raylib/src/raymath.h"
 #include "../masks/mask.h"
+#include "../gameplay_helpers.h"
 
 Entity InitPlayer(Vector2 spawnPos, Identity startIdentity) {
   Entity player = {0};
@@ -67,8 +68,8 @@ void UpdatePlayer(Entity *player, Level *currentLevel, float dt, bool godMode) {
 
     bool blocked_x = false;
     for (int i = 0; i < currentLevel->wallCount; i++) {
-      if (CheckCollisionCircleRec(xPos, player->radius,
-                    currentLevel->walls[i])) {
+      if (CheckCollisionCircleRotatedRect(xPos, player->radius,
+                    currentLevel->walls[i].rect, currentLevel->walls[i].rotation)) {
         blocked_x = true;
         break;
       }
@@ -105,7 +106,7 @@ void UpdatePlayer(Entity *player, Level *currentLevel, float dt, bool godMode) {
 
     bool blocked_y = false;
     for (int i = 0; i < currentLevel->wallCount; i++) {
-      if (CheckCollisionCircleRec(yPos, player->radius, currentLevel->walls[i])) {
+      if (CheckCollisionCircleRotatedRect(yPos, player->radius, currentLevel->walls[i].rect, currentLevel->walls[i].rotation)) {
         blocked_y = true;
         break;
       }
