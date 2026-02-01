@@ -10,40 +10,40 @@ static Texture2D texSigaraci[6];// shared frames for sigaraci
 
 extern bool gameWon;
 static const char *dlgBalikci[] = {
-    "Next.",
-    "If you're not buying, move.",
+    "Sen gereksiz insan yine mi?.",
+    "Burada istenmiyorsun., Kimligin bile yok",
     "No time."
 };
 
 static const char *dlgKiz[] = {
-    "...",
-    "Sorry.",
-    "I can't help." 
+    "YOK OL BURADAN!",
+    "Igrencsin! Kimsen yok! Burada istenmiyorsun",
+    "...." 
 };
 
 static const char *dlgSigaraci[] = {
-    "You again.",
-    "Keep walking.",
-    "...",
+    "S*ktr git buradan",
+    "YURU DEDIM SANA LAN!.",
+    "Igrent",
     "Take the mask."
 };
 
 static const char *plBalikci[] = {
-    "Just looking...",
-    "Sorry.",
-    "Okay."
+    "Lutfen benimle konus.",
+    "Kizmayin bana sadece yemek istiyorum.",
+    "Ozur dilerim."
 };
 
 static const char *plKiz[] = {
-    "Hi.",
-    "It's fine.",
-    "Okay."
+    "Kimligim olmayabilir ama beni dislama",
+    "Neden bana boyle davraniyorsunuz",
+    "Ozur dilerim."
 };
 
 static const char *plSigaraci[] = {
-    "...",
-    "I'm not here to fight.",
-    "Okay.",
+    "Arkadas olalim mi",
+    "Bana boyle davranma",
+    "BANA BOYLE DAVRANMA DEDIM SANA!.",
     "Why?"
 };
 
@@ -110,7 +110,7 @@ void InitProlog(Level *level) {
     // --- NPCs ---
     level->npcCount = 3; // one of each type
     // positions for each distinct NPC
-    Vector2 npcPos[3] = { { 600, 820 }, { 700, 780 }, { 500, 760 } };
+    Vector2 npcPos[3] = { { 600, 820 }, { 800, 800 }, { 500, 760 } };
     const char *names[3] = { "Balikci", "Kiz", "Sigaraci" };
 
     // Balikci (index 0)
