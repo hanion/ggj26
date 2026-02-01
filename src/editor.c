@@ -1,6 +1,8 @@
 #include "editor.h"
 #include <stdio.h>
+#include <string.h>
 #include "../raylib/src/rlgl.h"
+#include "enemies/enemy.h"
 #include "gameplay_helpers.h"
 
 
@@ -140,16 +142,19 @@ void editor_update_state(LevelEditor* ed) {
 
     if (IsKeyPressed(KEY_M)) {
         if (is_state_wall(ed->state)) ed->state = ED_MOVE_WALL;
+        if (is_state_door(ed->state)) ed->state = ED_MOVE_DOOR;
         if (is_state_bg(ed->state))   ed->state = ED_MOVE_BG;
     }
 
     if (IsKeyPressed(KEY_S)) {
         if (is_state_wall(ed->state)) ed->state = ED_SCALE_WALL;
+        if (is_state_door(ed->state)) ed->state = ED_SCALE_DOOR;
         if (is_state_bg(ed->state))   ed->state = ED_SCALE_BG;
     }
 
     if (IsKeyPressed(KEY_R)) {
         if (is_state_wall(ed->state)) ed->state = ED_ROTATE_WALL;
+        if (is_state_door(ed->state)) ed->state = ED_ROTATE_DOOR;
     }
 }
 
@@ -181,15 +186,11 @@ void editor_update(LevelEditor* ed, Camera2D* camera) {
 
     if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
         if (is_state_move(ed->state)) {
-            if (ed->state == ED_MOVE_ENEMY) {
-                ed->level->enemies[ed->selected].position.x = target_rect->x;
-                ed->level->enemies[ed->selected].position.y = target_rect->y;
-            } else {
-                target_rect->x = ed->mouse_world.x - ed->drag_offset.x;
-                target_rect->y = ed->mouse_world.y - ed->drag_offset.y;
-            }
+            target_rect->x = ed->mouse_world.x - ed->drag_offset.x;
+            target_rect->y = ed->mouse_world.y - ed->drag_offset.y;
         } 
     }
+
     if (is_state_move(ed->state)) {
         float step = ed->move_step;
         if (IsKeyDown(KEY_RIGHT)) target_rect->x  += step;
@@ -215,6 +216,13 @@ void editor_update(LevelEditor* ed, Camera2D* camera) {
         if (IsKeyDown(KEY_LEFT_SHIFT)) rotStep = 5.0f;
         if (IsKeyDown(KEY_RIGHT)) ed->level->walls[ed->selected].rotation += rotStep;
         if (IsKeyDown(KEY_LEFT))  ed->level->walls[ed->selected].rotation -= rotStep;
+    }
+
+    // apply rect edit to enemy
+    // because enemy does not have rect
+    if (ed->state == ED_MOVE_ENEMY) {
+        ed->level->enemies[ed->selected].position.x = target_rect->x;
+        ed->level->enemies[ed->selected].position.y = target_rect->y;
     }
 
 }
@@ -355,6 +363,11 @@ void editor_draw_debug(LevelEditor* ed, Camera2D* camera) {
 
 
 void editor_create_new_wall(LevelEditor* ed) {
+    if (ed->level->wallCount == MAX_WALLS) {
+        fprintf(stderr, "editor_create_new_wall: MAX_WALLS count reached in level->wallCount");
+        return;
+    }
+
     Wall* w = &ed->level->walls[ed->level->wallCount++];
     Wall new_wall = {0};
     new_wall.rect.x = ed->mouse_world.x;
@@ -362,6 +375,45 @@ void editor_create_new_wall(LevelEditor* ed) {
     new_wall.rect.width = 25;
     new_wall.rect.height = 25;
     *w = new_wall;
+}
+
+void editor_create_new_enemy(LevelEditor* ed, EnemyType type) {
+    if (ed->level->enemyCount == MAX_ENEMIES) {
+        fprintf(stderr, "editor_create_new_enemy: MAX_ENEMIES count reached in level->enemyCount");
+        return;
+    }
+    Entity* e = &ed->level->enemies[ed->level->enemyCount++];
+    *e = InitEnemy(ed->mouse_world, type);
+}
+
+void editor_create_new_door(LevelEditor* ed) {
+    if (ed->level->doorCount == MAX_DOORS) {
+        fprintf(stderr, "editor_create_new_door: MAX_DOORS count reached in level->doorCount");
+        return;
+    }
+
+    Door* w = &ed->level->doors[ed->level->doorCount++];
+    Door new_door = {0};
+    new_door.rect.x = ed->mouse_world.x;
+    new_door.rect.y = ed->mouse_world.y;
+    new_door.rect.width = 25;
+    new_door.rect.height = 25;
+    *w = new_door;
+}
+
+
+void editor_delete_entity(LevelEditor* ed) {
+    size_t to_delete_idx = ed->selected;
+
+    if (is_state_wall(ed->state)) {
+        memmove(ed->level->walls + to_delete_idx, ed->level->walls + to_delete_idx+1, ed->level->wallCount - to_delete_idx);
+        ed->level->wallCount--;
+    }
+
+    if (is_state_enemy(ed->state)) {
+        memmove(ed->level->enemies + to_delete_idx, ed->level->enemies + to_delete_idx+1, ed->level->enemyCount - to_delete_idx);
+        ed->level->enemyCount--;
+    }
 
 }
 
@@ -375,9 +427,25 @@ void LevelEditor_update(LevelEditor* ed, Camera2D* camera) {
 
     if (ed->state == ED_CLOSED)  return;
 
-    if (IsKeyPressed(KEY_W)) {
+    if (IsKeyPressed(KEY_N)) {
         editor_create_new_wall(ed);
     }
+    if (IsKeyPressed(KEY_L)) {
+        editor_delete_entity(ed);
+    }
+    if (IsKeyPressed(KEY_ONE)) {
+        editor_create_new_enemy(ed, ENEMY_CIVILIAN);
+    } else if (IsKeyPressed(KEY_TWO)) {
+        editor_create_new_enemy(ed, ENEMY_STAFF);
+    } else if (IsKeyPressed(KEY_THREE)) {
+        editor_create_new_enemy(ed, ENEMY_GUARD);
+    } else if (IsKeyPressed(KEY_FOUR)) {
+        editor_create_new_enemy(ed, ENEMY_ADMIN);
+    }
+    if (IsKeyPressed(KEY_B)) {
+        editor_create_new_door(ed);
+    }
+
 
     ed->mouse_world = GetScreenToWorld2D(GetMousePosition(), *camera);
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
@@ -393,9 +461,16 @@ void LevelEditor_update(LevelEditor* ed, Camera2D* camera) {
     editor_draw_debug(ed, camera);
     DrawText(
         TextFormat(
-            "EDITOR | selected: %d | state: %s \nM: MOVE | S: SCALE |  R: ROTATE\nI:export level",
-            ed->selected,
-            EditorState_cstr(ed->state)
+            "--- EDITOR ---\n"
+            "EditorState: %s\n"
+            "Selected id: %d\n\n"
+            "M: MOVE | S: SCALE |  R: ROTATE\n"
+            "L: Lose (delete) entity\n"
+            "N: New wall | B: new Door\n"
+            "Create Enemy:  1: Civilian | 2: Staff | 3: Guard | 4: Admin\n"
+            "I: export level",
+            EditorState_cstr(ed->state),
+            ed->selected
         ),
         10, 800, 20, YELLOW
     );
