@@ -15,7 +15,6 @@ typedef enum {
 
     ED_MOVE_DOOR,
     ED_SCALE_DOOR,
-    ED_ROTATE_DOOR,
 
     ED_MOVE_ENEMY,
 } EditorState;

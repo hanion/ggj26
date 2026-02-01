@@ -11,69 +11,17 @@ void InitEpisode3(Level *level) {
     
     // --- TEXTURES (10 Backgrounds as requested) ---
     // We only have ~7 distinct files, so we reuse them to create 10 distinct flooring zones
-    level->bgs_count = 10;
-    static Texture2D level_bg_textures[8]; // Cache
+    level->bgs_count = 1;
+    static Texture2D level_bg_textures; // Cache
     
     // Load if needed (Lazy load safety)
-    if (level_bg_textures[0].id == 0) level_bg_textures[0] = LoadTexture("assets/environment/background_1.png"); // Concrete
-    if (level_bg_textures[1].id == 0) level_bg_textures[1] = LoadTexture("assets/environment/background_2.png"); // Tiles
-    if (level_bg_textures[2].id == 0) level_bg_textures[2] = LoadTexture("assets/environment/background_3.png"); // Office
-    if (level_bg_textures[3].id == 0) level_bg_textures[3] = LoadTexture("assets/environment/background_4.png"); // Dark
-    if (level_bg_textures[4].id == 0) level_bg_textures[4] = LoadTexture("assets/environment/background_5.png"); // Lab
-    if (level_bg_textures[5].id == 0) level_bg_textures[5] = LoadTexture("assets/environment/background_6.png"); // Server
-    if (level_bg_textures[6].id == 0) level_bg_textures[6] = LoadTexture("assets/environment/background_7.png"); // Vault
+    if (level_bg_textures.id == 0) level_bg_textures = LoadTexture("assets/environment/background_3_1.png"); // Concrete
 
     // Zone 1: Lobby (Tiles)
-    level->bgs[0] = (Background){level_bg_textures[1], (Rectangle){0,0,800,800}, (Rectangle){0,0,800,800}};
-    level->bgs[1] = (Background){level_bg_textures[1], (Rectangle){0,0,800,800}, (Rectangle){0,800,800,800}};
-    
-    // Zone 2: Corridors (Concrete) - Hard transition
-    level->bgs[2] = (Background){level_bg_textures[0], (Rectangle){0,0,800,200}, (Rectangle){800, 300, 1000, 200}};
-    level->bgs[3] = (Background){level_bg_textures[0], (Rectangle){0,0,200,800}, (Rectangle){1600, 0, 200, 1600}};
-    
-    // Zone 3: Offices (Office + Dark)
-    level->bgs[4] = (Background){level_bg_textures[2], (Rectangle){0,0,800,600}, (Rectangle){1800, 0, 800, 600}};
-    level->bgs[5] = (Background){level_bg_textures[3], (Rectangle){0,0,800,600}, (Rectangle){1800, 800, 800, 600}};
-    
-    // Zone 4: Server Room
-    level->bgs[6] = (Background){level_bg_textures[5], (Rectangle){0,0,600,600}, (Rectangle){2600, 200, 600, 1000}};
-    
-    // Zone 5: Lab
-    level->bgs[7] = (Background){level_bg_textures[4], (Rectangle){0,0,500,500}, (Rectangle){3200, 0, 600, 700}};
-    
-    // Zone 6: Vault (Final)
-    level->bgs[8] = (Background){level_bg_textures[6], (Rectangle){0,0,400,800}, (Rectangle){3200, 800, 800, 800}};
-
-    // Extra decoration
-    level->bgs[9] = (Background){level_bg_textures[0], (Rectangle){0,0,100,100}, (Rectangle){-200, 0, 200, 1600}}; // Left border
+    level->bgs[0] = (Background){level_bg_textures, (Rectangle){0,0,8092,8092}, (Rectangle){0,0,8092,8092}};
 
     // --- WALLS (Maze Layout) ---
     level->wallCount = 0;
-    
-    // Boundaries
-    level->walls[level->wallCount++] = (Wall){(Rectangle){-50, -50, 4200, 50}, 0.0f}; // Top
-    level->walls[level->wallCount++] = (Wall){(Rectangle){-50, 1600, 4200, 50}, 0.0f}; // Bottom
-    level->walls[level->wallCount++] = (Wall){(Rectangle){-50, 0, 50, 1650}, 0.0f}; // Left
-    level->walls[level->wallCount++] = (Wall){(Rectangle){4000, 0, 50, 1650}, 0.0f}; // Right
-    
-    // Lobby dividers
-    level->walls[level->wallCount++] = (Wall){(Rectangle){800, 0, 20, 300}, 0.0f}; 
-    level->walls[level->wallCount++] = (Wall){(Rectangle){800, 500, 20, 1100}, 0.0f}; 
-    
-    // Corridor Walls
-    level->walls[level->wallCount++] = (Wall){(Rectangle){1000, 300, 20, 600}, 0.0f}; // Force zigzag
-    level->walls[level->wallCount++] = (Wall){(Rectangle){1400, 500, 20, 1100}, 0.0f}; 
-    
-    // Office Rooms
-    level->walls[level->wallCount++] = (Wall){(Rectangle){1800, 600, 800, 20}, 0.0f}; // Middle divider
-    
-    // Security Chokepoint
-    level->walls[level->wallCount++] = (Wall){(Rectangle){2600, 0, 20, 200}, 0.0f};
-    level->walls[level->wallCount++] = (Wall){(Rectangle){2600, 400, 20, 1200}, 0.0f};
-    
-    // Vault protection
-    level->walls[level->wallCount++] = (Wall){(Rectangle){3200, 0, 20, 700}, 0.0f};
-    level->walls[level->wallCount++] = (Wall){(Rectangle){3200, 900, 20, 700}, 0.0f};
 
     // --- DOORS ---
     level->doorCount = 0;
