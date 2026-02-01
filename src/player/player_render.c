@@ -317,6 +317,9 @@ void PlayerRender_Draw(const PlayerRender *pr, const Entity *player, PlayerEquip
         DrawShadow(pr->shadow, player->position, pr->spriteScale, pr->spritePivot);
     }
 
+    if (player->isInvisible) {
+        return;
+    }
     if (feetFrame.id != 0) {
         DrawFrame(feetFrame, player->position, player->rotation, pr->spriteScale, pr->spritePivot);
     }
