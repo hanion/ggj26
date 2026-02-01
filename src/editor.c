@@ -9,6 +9,7 @@ typedef enum {
 
     ED_MOVE_WALL,
     ED_SCALE_WALL,
+    ED_ROTATE_WALL,
 
     ED_MOVE_BG,
     ED_SCALE_BG,
@@ -19,17 +20,55 @@ typedef enum {
     ED_MOVE_ENEMY,
 } EditorState;
 
+bool is_state_closed(EditorState state) { return state == ED_CLOSED; }
+bool is_state_idle(EditorState state)   { return state == ED_IDLE; }
+
+bool is_state_wall(EditorState state) {
+    return state == ED_MOVE_WALL
+        || state == ED_SCALE_WALL
+        || state == ED_ROTATE_WALL;
+}
+bool is_state_bg(EditorState state) {
+    return state == ED_MOVE_BG
+        || state == ED_SCALE_BG;
+}
+bool is_state_door(EditorState state) {
+    return state == ED_MOVE_DOOR
+        || state == ED_SCALE_DOOR;
+}
+bool is_state_enemy(EditorState state) {
+    return state == ED_MOVE_ENEMY;
+}
+
+
+bool is_state_move(EditorState state) {
+    return state == ED_MOVE_WALL
+        || state == ED_MOVE_BG
+        || state == ED_MOVE_DOOR
+        || state == ED_MOVE_ENEMY;
+}
+bool is_state_scale(EditorState state) {
+    return state == ED_SCALE_WALL
+        || state == ED_SCALE_BG
+        || state == ED_SCALE_DOOR;
+}
+bool is_state_rotate(EditorState state) {
+    return state == ED_ROTATE_WALL;
+}
+
+
 const char* EditorState_cstr(EditorState state) {
     switch (state) {
-        case ED_CLOSED:     return "ED_CLOSED";
-        case ED_IDLE:       return "ED_IDLE";
-        case ED_MOVE_WALL:  return "ED_MOVE_WALL";
-        case ED_SCALE_WALL: return "ED_SCALE_WALL";
-        case ED_MOVE_BG:    return "ED_MOVE_BG";
-        case ED_SCALE_BG:   return "ED_SCALE_BG";
-        case ED_MOVE_DOOR:  return "ED_MOVE_DOOR";
-        case ED_SCALE_DOOR: return "ED_SCALE_DOOR";
-        case ED_MOVE_ENEMY: return "ED_MOVE_ENEMY";
+        case ED_CLOSED:      return "CLOSED";
+        case ED_IDLE:        return "IDLE";
+        case ED_MOVE_WALL:   return "MOVE_WALL";
+        case ED_SCALE_WALL:  return "SCALE_WALL";
+        case ED_ROTATE_WALL: return "ROTATE_WALL";
+        case ED_MOVE_BG:     return "MOVE_BG";
+        case ED_SCALE_BG:    return "SCALE_BG";
+        case ED_MOVE_DOOR:   return "MOVE_DOOR";
+        case ED_SCALE_DOOR:  return "SCALE_DOOR";
+        case ED_MOVE_ENEMY:  return "MOVE_ENEMY";
 	}
     return "INVALID ED STATE";
 }
@@ -130,13 +169,17 @@ void editor_update_state(LevelEditor* ed) {
     }
 
     if (IsKeyPressed(KEY_M)) {
-        if (ed->state == ED_SCALE_WALL) ed->state = ED_MOVE_WALL;
-        if (ed->state == ED_SCALE_BG)   ed->state = ED_MOVE_BG;
+        if (is_state_wall(ed->state)) ed->state = ED_MOVE_WALL;
+        if (is_state_bg(ed->state))   ed->state = ED_MOVE_BG;
     }
 
     if (IsKeyPressed(KEY_S)) {
-        if (ed->state == ED_MOVE_WALL) ed->state = ED_SCALE_WALL;
-        if (ed->state == ED_MOVE_BG)   ed->state = ED_SCALE_BG;
+        if (is_state_wall(ed->state)) ed->state = ED_SCALE_WALL;
+        if (is_state_bg(ed->state))   ed->state = ED_SCALE_BG;
+    }
+
+    if (IsKeyPressed(KEY_R)) {
+        if (is_state_wall(ed->state)) ed->state = ED_ROTATE_WALL;
     }
 }
 
@@ -148,11 +191,11 @@ void editor_update(LevelEditor* ed, Camera2D* camera) {
     float mouse_wheel = GetMouseWheelMove();
     camera->zoom += mouse_wheel*0.25f;
 
-
     Rectangle* target_rect = NULL;
 	Rectangle enemy_dummy_rect = {0};
     switch (ed->state) {
         case ED_MOVE_WALL:
+        case ED_ROTATE_WALL:
         case ED_SCALE_WALL:   target_rect = &ed->level->walls[ed->selected]; break;
         case ED_MOVE_BG:
         case ED_SCALE_BG:     target_rect = &ed->level->bgs[ed->selected].dest; break;
@@ -167,24 +210,24 @@ void editor_update(LevelEditor* ed, Camera2D* camera) {
     }
 
     if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
-        if (ed->state == ED_MOVE_WALL || ed->state == ED_MOVE_BG || ed->state == ED_MOVE_DOOR || ed->state == ED_MOVE_ENEMY) {
+        if (is_state_move(ed->state)) {
             target_rect->x = ed->mouse_world.x - ed->drag_offset.x;
             target_rect->y = ed->mouse_world.y - ed->drag_offset.y;
-        } else if (ed->state == ED_SCALE_WALL || ed->state == ED_SCALE_BG || ed->state == ED_SCALE_DOOR) {
-            float step = ed->scale_step;
-            if (IsKeyDown(KEY_LEFT_SHIFT)) step *= 4.0f;
-            if (IsKeyDown(KEY_LEFT_ALT))   step *= 0.25f;
-
-            if (IsKeyDown(KEY_RIGHT)) target_rect->width  += step;
-            if (IsKeyDown(KEY_LEFT))  target_rect->width  -= step;
-            if (IsKeyDown(KEY_DOWN))  target_rect->height += step;
-            if (IsKeyDown(KEY_UP))    target_rect->height -= step;
-        }
-
-        if (ed->state == ED_MOVE_ENEMY) {
+        } else if (ed->state == ED_MOVE_ENEMY) {
             ed->level->enemies[ed->selected].position.x = target_rect->x;
             ed->level->enemies[ed->selected].position.y = target_rect->y;
         }
+    }
+
+    if (is_state_scale(ed->state)) {
+        float step = ed->scale_step;
+        if (IsKeyDown(KEY_LEFT_SHIFT)) step *= 4.0f;
+        if (IsKeyDown(KEY_LEFT_ALT))   step *= 0.25f;
+
+        if (IsKeyDown(KEY_RIGHT)) target_rect->width  += step;
+        if (IsKeyDown(KEY_LEFT))  target_rect->width  -= step;
+        if (IsKeyDown(KEY_DOWN))  target_rect->height += step;
+        if (IsKeyDown(KEY_UP))    target_rect->height -= step;
     }
 }
 
@@ -307,15 +350,13 @@ void level_editor_draw(LevelEditor* ed, Camera2D* camera) {
     for (int i = 0; i < ed->level->wallCount; i++) {
         DrawRectangleRec(ed->level->walls[i], DARKGRAY);
 
-        if ((ed->state == ED_MOVE_WALL || ed->state == ED_SCALE_WALL) &&
-            i == ed->selected) {
+        if (is_state_wall(ed->state) && i == ed->selected) {
             DrawRectangleLinesEx(ed->level->walls[i], 2, RED);
         }
     }
     // draw bg
     for (int i = 0; i < ed->level->bgs_count; i++) {
-        if ((ed->state == ED_MOVE_BG || ed->state == ED_SCALE_BG) &&
-            i == ed->selected) {
+        if (is_state_bg(ed->state) && i == ed->selected) {
             DrawRectangleLinesEx(ed->level->bgs[i].dest, 2, RED);
         }
     }
