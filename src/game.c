@@ -387,9 +387,19 @@ static void SpawnBlood(Vector2 pos, int count) {
 
 static void UpdateGame(float dt) {
 	camera.offset = (Vector2){ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f };
-	float scale_x = GetScreenWidth()  / 1920.0f;
-	float scale_y = GetScreenHeight() / 1080.0f;
-	camera.zoom = 1.5f*fminf(scale_x, scale_y);
+
+    static float screen_width = 0;
+    static float screen_height = 0;
+    float width  = GetScreenWidth();
+    float height = GetScreenHeight();
+    if (width != screen_width || height != screen_height) {
+        screen_width  =  width;
+        screen_height = height;
+        float scale_x =  width / 1920.0f;
+        float scale_y = height / 1080.0f;
+        camera.zoom = 1.5f*fminf(scale_x, scale_y);
+    }
+
 
 
     // Debug Toggle F1
@@ -499,7 +509,7 @@ static void UpdateGame(float dt) {
     Mask *currentMask = &player.inventory.maskSlots[player.inventory.currentMaskIndex];
 
     // Mask Interaction
-    if (IsKeyPressed(KEY_P)) {
+    if (IsKeyPressed(KEY_C)) {
         if (currentMask->type != MASK_NONE) {
             currentMask->isActive = !currentMask->isActive;
         }
@@ -524,6 +534,13 @@ static void UpdateGame(float dt) {
         weaponShootTimer = 0.0f;
         PlayerRender_OnEquip(&playerRender, currentEquipState);
         lastEquipmentState = currentEquipState;
+        
+        // Auto-reload when switching to a weapon with 0 ammo
+        if (currentGun->type != GUN_KNIFE && currentGun->type != GUN_NONE &&
+            currentGun->currentAmmo == 0 && currentGun->reserveAmmo > 0) {
+            player.isReloading = true;
+            player.reloadTimer = currentGun->reloadTime;
+        }
     }
 
     // Camera Update
@@ -564,13 +581,24 @@ static void UpdateGame(float dt) {
             player.reloadTimer = 0.0f;
         }
     }
+    
+    // Manual reload with R key (only if not already reloading, has gun, and not full ammo)
+    if (IsKeyPressed(KEY_R) && !player.isReloading && hasGunEquipped && 
+        currentGun->type != GUN_KNIFE && currentGun->currentAmmo < currentGun->maxAmmo && 
+        currentGun->reserveAmmo > 0) {
+        player.isReloading = true;
+        player.reloadTimer = currentGun->reloadTime;
+        PlaySound(fxReload);
+    }
 
     // Update common systems
     Npc_UpdateAll(&currentLevel, dt, &player); // optional if episode handles it; kept to ensure animations advance
 
     // 1. Update Enemies
-    for (int i = 0; i < currentLevel.enemyCount; i++) {
-        UpdateEnemy(&currentLevel.enemies[i], player.position, &currentLevel, bullets, MAX_BULLETS, dt);
+    if (editor.state == ED_CLOSED) {
+        for (int i = 0; i < currentLevel.enemyCount; i++) {
+            UpdateEnemy(&currentLevel.enemies[i], player.position, &currentLevel, bullets, MAX_BULLETS, dt);
+        }
     }
 
     // 2. Player Shooting
@@ -977,6 +1005,8 @@ static void DrawGame(void) {
         }
 
         // Draw Level Elements
+        // NOTE: Walls are invisible by default (Collision Only). 
+        // They are only drawn if Debug Draw is enabled (Press F1).
         if (playerDebugDraw) {
             for (int i = 0; i < currentLevel.wallCount; i++) DrawRectangleRec(currentLevel.walls[i], Fade(RED, 0.5f));
         }
@@ -1185,7 +1215,8 @@ static void DrawGame(void) {
         // Player
         if (playerRender.loaded) {
             PlayerRender_Draw(&playerRender, &player, lastEquipmentState);
-            PlayerRender_DrawMuzzleFlash(&playerRender, &player, lastEquipmentState, weaponShootTimer);
+            Gun *renderGun = &player.inventory.gunSlots[player.inventory.currentGunIndex];
+            PlayerRender_DrawMuzzleFlash(&playerRender, &player, lastEquipmentState, weaponShootTimer, renderGun->cooldown);
         } else {
             PlayerRender_DrawFallback(player.position, player.radius); // Fallback if not loaded
         }
@@ -1252,7 +1283,7 @@ static void DrawGame(void) {
         Mask m = player.inventory.maskSlots[player.inventory.currentMaskIndex];
         if (m.type != MASK_NONE) {
              const char *maskName = (m.type == MASK_SPEED) ? "Speed Mask" : (m.type == MASK_STEALTH ? "Stealth Mask" : "Unknown Mask");
-             DrawText(TextFormat("SELECTED: %s [PRESS P TO ACTIVATE]", maskName), GetScreenWidth()/2 - 200, 50, 20, YELLOW);
+             DrawText(TextFormat("SELECTED: %s [PRESS C TO ACTIVATE]", maskName), GetScreenWidth()/2 - 200, 50, 20, YELLOW);
         }
     }
 
