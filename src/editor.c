@@ -25,17 +25,23 @@ bool is_state_door(EditorState state) {
 bool is_state_enemy(EditorState state) {
     return state == ED_MOVE_ENEMY;
 }
+bool is_state_wa(EditorState state) {
+    return state == ED_MOVE_WA
+        || state == ED_SCALE_WA;
+}
 
 
 bool is_state_move(EditorState state) {
     return state == ED_MOVE_WALL
         || state == ED_MOVE_BG
         || state == ED_MOVE_DOOR
+        || state == ED_MOVE_WA
         || state == ED_MOVE_ENEMY;
 }
 bool is_state_scale(EditorState state) {
     return state == ED_SCALE_WALL
         || state == ED_SCALE_BG
+        || state == ED_SCALE_WA
         || state == ED_SCALE_DOOR;
 }
 bool is_state_rotate(EditorState state) {
@@ -55,6 +61,8 @@ const char* EditorState_cstr(EditorState state) {
         case ED_MOVE_DOOR:   return "MOVE_DOOR";
         case ED_SCALE_DOOR:  return "SCALE_DOOR";
         case ED_MOVE_ENEMY:  return "MOVE_ENEMY";
+        case ED_MOVE_WA:     return "MOVE_WA";
+        case ED_SCALE_WA:    return "SCALE_WA";
     }
     return "INVALID ED STATE";
 }
@@ -70,6 +78,17 @@ LevelEditor LevelEditor_new(Level* level) {
 
 
 void editor_pick(LevelEditor* ed) {
+    Rectangle *r = &ed->level->win_area;
+    if (CheckCollisionPointRec(ed->mouse_world, *r)) {
+        ed->state = ED_MOVE_WA;
+        ed->selected = -2;
+        ed->drag_offset = (Vector2){
+            ed->mouse_world.x - r->x,
+            ed->mouse_world.y - r->y
+        };
+        return;
+    }
+
     for (int i = 0; i < ed->level->enemyCount; i++) {
         Rectangle r = {0};
         int ext = 25;
@@ -126,6 +145,7 @@ void editor_pick(LevelEditor* ed) {
             return;
         }
     }
+
 }
 
 
@@ -144,12 +164,14 @@ void editor_update_state(LevelEditor* ed) {
         if (is_state_wall(ed->state)) ed->state = ED_MOVE_WALL;
         if (is_state_door(ed->state)) ed->state = ED_MOVE_DOOR;
         if (is_state_bg(ed->state))   ed->state = ED_MOVE_BG;
+        if (is_state_wa(ed->state))   ed->state = ED_MOVE_WA;
     }
 
     if (IsKeyPressed(KEY_S)) {
         if (is_state_wall(ed->state)) ed->state = ED_SCALE_WALL;
         if (is_state_door(ed->state)) ed->state = ED_SCALE_DOOR;
         if (is_state_bg(ed->state))   ed->state = ED_SCALE_BG;
+        if (is_state_wa(ed->state))   ed->state = ED_SCALE_WA;
     }
 
     if (IsKeyPressed(KEY_R)) {
@@ -175,6 +197,8 @@ void editor_update(LevelEditor* ed, Camera2D* camera) {
         case ED_SCALE_BG:     target_rect = &ed->level->bgs[ed->selected].dest; break;
         case ED_MOVE_DOOR:
         case ED_SCALE_DOOR:   target_rect = &ed->level->doors[ed->selected].rect; break;
+        case ED_MOVE_WA:
+        case ED_SCALE_WA:     target_rect = &ed->level->win_area; break;
         case ED_MOVE_ENEMY: {
             enemy_dummy_rect.x = ed->level->enemies[ed->selected].position.x;
             enemy_dummy_rect.y = ed->level->enemies[ed->selected].position.y;
@@ -313,6 +337,14 @@ void level_editor_export(LevelEditor* ed) {
         printf("level->enemies[%d].identity = enemy_id_%d;\n", i, i);
     }
 
+    printf("\n// ---- WIN AREA ----\n");
+    printf("level->win_area = (Rectangle){%f,%f,%f,%f};\n",
+           level->win_area.x,
+           level->win_area.y,
+           level->win_area.width,
+           level->win_area.height
+    );
+
     printf("// ---- LEVEL EDITOR EXPORT END ----\n");
 }
 
@@ -353,6 +385,12 @@ void editor_draw_debug(LevelEditor* ed, Camera2D* camera) {
             DrawCircleLines(ed->level->enemies[i].position.x, ed->level->enemies[i].position.y, 24, RED);
             DrawCircleLines(ed->level->enemies[i].position.x, ed->level->enemies[i].position.y, 23, RED);
         }
+    }
+
+    // draw win_area
+    DrawRectangleLinesEx(ed->level->win_area, 2, GREEN);
+    if (is_state_wa(ed->state)) {
+        DrawRectangleLinesEx(ed->level->win_area, 2, RED);
     }
 
     EndMode2D();

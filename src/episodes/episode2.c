@@ -13,7 +13,6 @@ void InitEpisode2(Level *level) {
     level->id = 2;
     level->playerSpawn = (Vector2){100.0f, 320.0f};
     level->playerStartId = GetIdentity(ENEMY_CIVILIAN);
-    level->winX = 3800.0f; // Adjusted for 4 zones
 
     level->wallCount = 0;
     level->doorCount = 0;
@@ -144,6 +143,9 @@ void InitEpisode2(Level *level) {
     level->enemies[level->enemyCount++] = InitEnemy((Vector2){2800, 200}, ENEMY_ADMIN);
     level->enemies[level->enemyCount++] = InitEnemy((Vector2){2800, 500}, ENEMY_ADMIN);
     level->enemies[level->enemyCount++] = InitEnemy((Vector2){3400, 320}, ENEMY_ADMIN); // Boss
+
+    // ---- WIN AREA ----
+    level->win_area = (Rectangle){341.961548,2164.302490,438.000000,274.000000};
 }
 
 void UnloadEpisode2() {

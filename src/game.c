@@ -977,14 +977,9 @@ static void UpdateGame(float dt) {
 
     // Check Win Condition (Reach Win Area or Enemies Cleared? or Zone 7?)
     // For Episode 1, let's say reach Zone 7 bottom? 
-    if (currentLevel.id == 0) {
-        if (player.position.y > 1000.0f) { // Example win condition for prolog
-            gameWon = true;
-        }
-    } else if (player.position.y > 2000.0f) {
+    if (CheckCollisionCircleRec(player.position, player.radius + 10.0f, currentLevel.win_area)) {
         gameWon = true;
     }
-
 } // End UpdateGame
 
 static void DrawGame(void) {

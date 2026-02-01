@@ -52,7 +52,6 @@ void InitEpisode1(Level *level) {
   level->id = 1;
   level->playerSpawn = (Vector2){100.0f, 320.0f}; // Start in Z1
   level->playerStartId = idCivilian;
-  level->winX = -1.0f; // Handled by Y check
 
   level->wallCount = 0;
 
@@ -194,6 +193,9 @@ void InitEpisode1(Level *level) {
     level->bgs[6] = (Background){texZone6, (Rectangle){0,0,texZone6.width,texZone6.height}, (Rectangle){162,654,795,853}};
     level->bgs[7] = (Background){texZone7, (Rectangle){0,0,texZone7.width,texZone7.height}, (Rectangle){162,1507,795,805}};
 	level->bgs_count = 8;
+
+    // ---- WIN AREA ----
+    level->win_area = (Rectangle){341.961548,2164.302490,438.000000,274.000000};
 }
 
 void UnloadEpisode1() {

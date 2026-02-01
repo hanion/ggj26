@@ -7,7 +7,6 @@ void InitEpisode3(Level *level) {
     level->id = 3; // Episode 3
     level->playerSpawn = (Vector2){100.0f, 300.0f};
     level->playerStartId = GetIdentity(ENEMY_CIVILIAN); // Start undercover
-    level->winX = 3900.0f; // Challenge: Reach the far right
     
     // --- TEXTURES (10 Backgrounds as requested) ---
     // We only have ~7 distinct files, so we reuse them to create 10 distinct flooring zones

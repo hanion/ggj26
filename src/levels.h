@@ -77,8 +77,7 @@ typedef struct {
   Vector2 playerSpawn;
   Identity playerStartId;
 
-  // Win Condition (Reach X)
-  float winX;
+  Rectangle win_area;
 
   Background bgs[MAX_DOORS];
   size_t bgs_count;
