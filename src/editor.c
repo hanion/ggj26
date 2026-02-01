@@ -190,6 +190,13 @@ void editor_update(LevelEditor* ed, Camera2D* camera) {
             }
         } 
     }
+    if (is_state_move(ed->state)) {
+        float step = ed->move_step;
+        if (IsKeyDown(KEY_RIGHT)) target_rect->x  += step;
+        if (IsKeyDown(KEY_LEFT))  target_rect->x  -= step;
+        if (IsKeyDown(KEY_DOWN))  target_rect->y += step;
+        if (IsKeyDown(KEY_UP))    target_rect->y -= step;
+    }
 
 
     if (is_state_scale(ed->state)) {
@@ -345,6 +352,19 @@ void editor_draw_debug(LevelEditor* ed, Camera2D* camera) {
 }
 
 
+
+
+void editor_create_new_wall(LevelEditor* ed) {
+    Wall* w = &ed->level->walls[ed->level->wallCount++];
+    Wall new_wall = {0};
+    new_wall.rect.x = ed->mouse_world.x;
+    new_wall.rect.y = ed->mouse_world.y;
+    new_wall.rect.width = 25;
+    new_wall.rect.height = 25;
+    *w = new_wall;
+
+}
+
 void LevelEditor_update(LevelEditor* ed, Camera2D* camera) {
     if (!ed || !ed->level) return;
 
@@ -355,6 +375,9 @@ void LevelEditor_update(LevelEditor* ed, Camera2D* camera) {
 
     if (ed->state == ED_CLOSED)  return;
 
+    if (IsKeyPressed(KEY_W)) {
+        editor_create_new_wall(ed);
+    }
 
     ed->mouse_world = GetScreenToWorld2D(GetMousePosition(), *camera);
     if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
@@ -370,9 +393,9 @@ void LevelEditor_update(LevelEditor* ed, Camera2D* camera) {
     editor_draw_debug(ed, camera);
     DrawText(
         TextFormat(
-            "EDITOR | state: %s | selected: %d",
-            EditorState_cstr(ed->state),
-            ed->selected
+            "EDITOR | selected: %d | state: %s \nM: MOVE | S: SCALE |  R: ROTATE\nI:export level",
+            ed->selected,
+            EditorState_cstr(ed->state)
         ),
         10, 800, 20, YELLOW
     );
