@@ -8,6 +8,44 @@ static Texture2D texBalikci[3]; // shared frames for balikci
 static Texture2D texKiz[4];     // shared frames for kiz_cocuk
 static Texture2D texSigaraci[6];// shared frames for sigaraci
 
+static const char *dlgBalikci[] = {
+    "Next.",
+    "If you're not buying, move.",
+    "No time."
+};
+
+static const char *dlgKiz[] = {
+    "...",
+    "Sorry.",
+    "I can't help." 
+};
+
+static const char *dlgSigaraci[] = {
+    "You again.",
+    "Keep walking.",
+    "...",
+    "Take the mask."
+};
+
+static const char *plBalikci[] = {
+    "Just looking...",
+    "Sorry.",
+    "Okay."
+};
+
+static const char *plKiz[] = {
+    "Hi.",
+    "It's fine.",
+    "Okay."
+};
+
+static const char *plSigaraci[] = {
+    "...",
+    "I'm not here to fight.",
+    "Okay.",
+    "Why?"
+};
+
 void InitProlog(Level *level) {
     level->id = 0;
     level->playerSpawn = (Vector2){ 400, 800 };
@@ -87,6 +125,12 @@ void InitProlog(Level *level) {
     level->npcs[0].frames[0] = texBalikci[0];
     level->npcs[0].frames[1] = texBalikci[1];
     level->npcs[0].frames[2] = texBalikci[2];
+    level->npcs[0].dialogueLines = dlgBalikci;
+    level->npcs[0].dialogueLineCount = (int)(sizeof(dlgBalikci) / sizeof(dlgBalikci[0]));
+    level->npcs[0].dialogueLineIndex = 0;
+    level->npcs[0].dialogueCompleted = false;
+    level->npcs[0].playerReplyLines = plBalikci;
+    level->npcs[0].playerReplyLineCount = (int)(sizeof(plBalikci) / sizeof(plBalikci[0]));
 
     // Kiz (index 1)
     level->npcs[1].position = npcPos[1];
@@ -102,6 +146,12 @@ void InitProlog(Level *level) {
     level->npcs[1].frames[1] = texKiz[1];
     level->npcs[1].frames[2] = texKiz[2];
     level->npcs[1].frames[3] = texKiz[3];
+    level->npcs[1].dialogueLines = dlgKiz;
+    level->npcs[1].dialogueLineCount = (int)(sizeof(dlgKiz) / sizeof(dlgKiz[0]));
+    level->npcs[1].dialogueLineIndex = 0;
+    level->npcs[1].dialogueCompleted = false;
+    level->npcs[1].playerReplyLines = plKiz;
+    level->npcs[1].playerReplyLineCount = (int)(sizeof(plKiz) / sizeof(plKiz[0]));
 
     // Sigaraci (index 2)
     level->npcs[2].position = npcPos[2];
@@ -119,6 +169,20 @@ void InitProlog(Level *level) {
     level->npcs[2].frames[3] = texSigaraci[3];
     level->npcs[2].frames[4] = texSigaraci[4];
     level->npcs[2].frames[5] = texSigaraci[5];
+    level->npcs[2].dialogueLines = dlgSigaraci;
+    level->npcs[2].dialogueLineCount = (int)(sizeof(dlgSigaraci) / sizeof(dlgSigaraci[0]));
+    level->npcs[2].dialogueLineIndex = 0;
+    level->npcs[2].dialogueCompleted = false;
+    level->npcs[2].playerReplyLines = plSigaraci;
+    level->npcs[2].playerReplyLineCount = (int)(sizeof(plSigaraci) / sizeof(plSigaraci[0]));
+
+    // Ensure dialogue/UI defaults
+    level->activeDialogueText = NULL;
+    level->activeDialogueTimer = 0.0f;
+    level->activeDialoguePos = (Vector2){0, 0};
+    level->activeDialogueIsPlayer = false;
+    level->showOutroLine = false;
+    level->outroLineTimer = 0.0f;
 }
 
 void UnloadProlog() {
