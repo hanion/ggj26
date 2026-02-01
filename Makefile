@@ -41,6 +41,7 @@ SRC = src/main.c \
     src/masks/mask1.c \
     src/masks/mask2.c \
     src/masks/mask_manager.c \
+    src/editor.c \
     src/npc/npc.c
 
 ggj26: $(SRC)

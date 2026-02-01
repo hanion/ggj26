@@ -24,7 +24,7 @@
 #include "npc/npc.h"
 #include "episodes/episodes.h"
 
-#include "editor.c"
+#include "editor.h"
 
 // Game Constants
 #define MAX_BULLETS 100
@@ -1296,7 +1296,7 @@ static void DrawGame(void) {
     }
     }
 
-	level_editor_draw(&editor, &camera);
+    LevelEditor_update(&editor, &camera);
     EndDrawing();
 }
 
