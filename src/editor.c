@@ -53,7 +53,7 @@ const char* EditorState_cstr(EditorState state) {
         case ED_MOVE_DOOR:   return "MOVE_DOOR";
         case ED_SCALE_DOOR:  return "SCALE_DOOR";
         case ED_MOVE_ENEMY:  return "MOVE_ENEMY";
-	}
+    }
     return "INVALID ED STATE";
 }
 
@@ -162,7 +162,7 @@ void editor_update(LevelEditor* ed, Camera2D* camera) {
     camera->zoom += mouse_wheel*0.25f;
 
     Rectangle* target_rect = NULL;
-	Rectangle enemy_dummy_rect = {0};
+    Rectangle enemy_dummy_rect = {0};
     switch (ed->state) {
         case ED_MOVE_WALL:
         case ED_ROTATE_WALL:
@@ -181,12 +181,14 @@ void editor_update(LevelEditor* ed, Camera2D* camera) {
 
     if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
         if (is_state_move(ed->state)) {
-            target_rect->x = ed->mouse_world.x - ed->drag_offset.x;
-            target_rect->y = ed->mouse_world.y - ed->drag_offset.y;
-        } else if (ed->state == ED_MOVE_ENEMY) {
-            ed->level->enemies[ed->selected].position.x = target_rect->x;
-            ed->level->enemies[ed->selected].position.y = target_rect->y;
-        }
+            if (ed->state == ED_MOVE_ENEMY) {
+                ed->level->enemies[ed->selected].position.x = target_rect->x;
+                ed->level->enemies[ed->selected].position.y = target_rect->y;
+            } else {
+                target_rect->x = ed->mouse_world.x - ed->drag_offset.x;
+                target_rect->y = ed->mouse_world.y - ed->drag_offset.y;
+            }
+        } 
     }
 
 
@@ -201,20 +203,13 @@ void editor_update(LevelEditor* ed, Camera2D* camera) {
         if (IsKeyDown(KEY_UP))    target_rect->height -= step;
     }
 
-    // ROTATION (Applied to Walls)
-    if (ed->state == ED_MOVE_WALL || ed->state == ED_SCALE_WALL) {
-            float rotStep = 1.0f;
-            if (IsKeyDown(KEY_LEFT_SHIFT)) rotStep = 5.0f;
-            
-            if (IsKeyDown(KEY_Q)) ed->level->walls[ed->selected].rotation -= rotStep;
-            if (IsKeyDown(KEY_E)) ed->level->walls[ed->selected].rotation += rotStep;
+    if (is_state_rotate(ed->state)) {
+        float rotStep = 1.0f;
+        if (IsKeyDown(KEY_LEFT_SHIFT)) rotStep = 5.0f;
+        if (IsKeyDown(KEY_RIGHT)) ed->level->walls[ed->selected].rotation += rotStep;
+        if (IsKeyDown(KEY_LEFT))  ed->level->walls[ed->selected].rotation -= rotStep;
     }
 
-    if (ed->state == ED_MOVE_ENEMY) {
-        ed->level->enemies[ed->selected].position.x = target_rect->x;
-        ed->level->enemies[ed->selected].position.y = target_rect->y;
-    }
-    
 }
 
 const char* PermissionLevel_cstr(PermissionLevel pl) {
@@ -223,7 +218,7 @@ const char* PermissionLevel_cstr(PermissionLevel pl) {
         case PERM_STAFF: return "PERM_STAFF";
         case PERM_GUARD: return "PERM_GUARD";
         case PERM_ADMIN: return "PERM_ADMIN";
-	}
+    }
     return "INVALID PERM";
 }
 
@@ -234,14 +229,14 @@ const char* EnemyType_cstr(EnemyType type) {
         case ENEMY_STAFF:    return "ENEMY_STAFF";
         case ENEMY_GUARD:    return "ENEMY_GUARD";
         case ENEMY_ADMIN:    return "ENEMY_ADMIN";
-	}
+    }
     return "INVALID ENEMY TYPE";
 }
 const char* AIType_cstr(AIType type) {
     switch (type) {
         case AI_WALKER:   return "AI_WALKER";
         case AI_GUARDIAN: return "AI_WALKER";
-	}
+    }
     return "INVALID AI TYPE";
 }
 
@@ -308,6 +303,46 @@ void level_editor_export(LevelEditor* ed) {
 }
 
 
+void editor_draw_debug(LevelEditor* ed, Camera2D* camera) {
+    BeginMode2D(*camera);
+    // draw wall
+    for (int i = 0; i < ed->level->wallCount; i++) {
+        Wall* w = &ed->level->walls[i];
+        Vector2 center = { w->rect.x + w->rect.width/2.0f, w->rect.y + w->rect.height/2.0f };
+        DrawRectanglePro(
+            (Rectangle){center.x, center.y, w->rect.width, w->rect.height},
+            (Vector2){w->rect.width/2.0f, w->rect.height/2.0f},
+            w->rotation, 
+            DARKGRAY
+        );
+
+        if (is_state_wall(ed->state) && i == ed->selected) {
+             rlPushMatrix();
+             rlTranslatef(center.x, center.y, 0);
+             rlRotatef(w->rotation, 0,0,1);
+             rlTranslatef(-w->rect.width/2.0f, -w->rect.height/2.0f, 0);
+             DrawRectangleLines(0, 0, w->rect.width, w->rect.height, RED);
+             rlPopMatrix();
+        }
+    }
+    // draw bg
+    for (int i = 0; i < ed->level->bgs_count; i++) {
+        if (is_state_bg(ed->state) && i == ed->selected) {
+            DrawRectangleLinesEx(ed->level->bgs[i].dest, 2, RED);
+        }
+    }
+    for (int i = 0; i < ed->level->enemyCount; i++) {
+        int ext = 25;
+        if (is_state_enemy(ed->state) &&
+            i == ed->selected) {
+            DrawCircleLines(ed->level->enemies[i].position.x, ed->level->enemies[i].position.y, 25, RED);
+            DrawCircleLines(ed->level->enemies[i].position.x, ed->level->enemies[i].position.y, 24, RED);
+            DrawCircleLines(ed->level->enemies[i].position.x, ed->level->enemies[i].position.y, 23, RED);
+        }
+    }
+
+    EndMode2D();
+}
 
 
 void LevelEditor_update(LevelEditor* ed, Camera2D* camera) {
@@ -332,51 +367,7 @@ void LevelEditor_update(LevelEditor* ed, Camera2D* camera) {
         level_editor_export(ed);
     }
 
-    BeginMode2D(*camera);
-    // draw wall
-    for (int i = 0; i < ed->level->wallCount; i++) {
-        Wall w = ed->level->walls[i];
-        
-        // Draw Centered
-        // Center of the wall in world space
-        Vector2 center = { w.rect.x + w.rect.width/2.0f, w.rect.y + w.rect.height/2.0f };
-        
-        // Draw using center as target and w/2,h/2 as origin -> Rotates around center
-        DrawRectanglePro(
-            (Rectangle){center.x, center.y, w.rect.width, w.rect.height}, 
-            (Vector2){w.rect.width/2.0f, w.rect.height/2.0f}, 
-            w.rotation, 
-            DARKGRAY
-        );
-
-        if (is_state_wall(ed->state) && i == ed->selected) {
-             // Draw Outline
-             rlPushMatrix();
-             rlTranslatef(center.x, center.y, 0);
-             rlRotatef(w.rotation, 0,0,1);
-             rlTranslatef(-w.rect.width/2.0f, -w.rect.height/2.0f, 0); // Move back to TL to draw AABB lines 
-             DrawRectangleLines(0, 0, w.rect.width, w.rect.height, RED);
-             rlPopMatrix();
-        }
-    }
-    // draw bg
-    for (int i = 0; i < ed->level->bgs_count; i++) {
-        if (is_state_bg(ed->state) && i == ed->selected) {
-            DrawRectangleLinesEx(ed->level->bgs[i].dest, 2, RED);
-        }
-    }
-    for (int i = 0; i < ed->level->enemyCount; i++) {
-        int ext = 25;
-        if ((ed->state == ED_MOVE_ENEMY) &&
-            i == ed->selected) {
-            DrawCircleLines(ed->level->enemies[i].position.x, ed->level->enemies[i].position.y, 25, RED);
-            DrawCircleLines(ed->level->enemies[i].position.x, ed->level->enemies[i].position.y, 24, RED);
-            DrawCircleLines(ed->level->enemies[i].position.x, ed->level->enemies[i].position.y, 23, RED);
-        }
-    }
-
-
-    EndMode2D();
+    editor_draw_debug(ed, camera);
     DrawText(
         TextFormat(
             "EDITOR | state: %s | selected: %d",
@@ -385,7 +376,6 @@ void LevelEditor_update(LevelEditor* ed, Camera2D* camera) {
         ),
         10, 800, 20, YELLOW
     );
-    DrawText("Controls: M/S (Mode), Arrows (Move/Scale), Q/E (Rotate Wall), Shift (Fast), I/O (Export/Toggle)", 10, 830, 20, GREEN);
 }
 
 
