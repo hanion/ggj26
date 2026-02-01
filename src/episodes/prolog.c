@@ -8,6 +8,7 @@ static Texture2D texBalikci[3]; // shared frames for balikci
 static Texture2D texKiz[4];     // shared frames for kiz_cocuk
 static Texture2D texSigaraci[6];// shared frames for sigaraci
 
+extern bool gameWon;
 static const char *dlgBalikci[] = {
     "Next.",
     "If you're not buying, move.",
