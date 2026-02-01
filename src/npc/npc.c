@@ -3,6 +3,7 @@
 #include "gameplay_helpers.h"
 #include <stdio.h>
 #include <string.h>
+extern bool gameWon;
 
 static void Npc_StartDialogue(Level *level, const NPC *n, const char *line, bool isPlayer) {
     level->activeDialogueText = line;
@@ -135,6 +136,16 @@ void Npc_UpdateAll(Level *level, float dt, Entity *player) {
         if (level->activeDialogueTimer <= 0.0f) {
             level->activeDialogueTimer = 0.0f;
             level->activeDialogueText = NULL;
+        }
+    }
+
+    // Success message timer -> triggers level end
+    if (level->maskTakenMsgTimer > 0.0f) {
+        level->maskTakenMsgTimer -= dt;
+        if (level->maskTakenMsgTimer <= 0.0f) {
+            level->maskTakenMsgTimer = 0.0f;
+            level->showOutroLine = true; // Trigger level transition in prolog.c
+            gameWon = 1; // Set game won flag
         }
     }
 
