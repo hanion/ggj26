@@ -330,7 +330,15 @@ void level_editor_export(LevelEditor* ed) {
     for (int i = 0; i < level->enemyCount; i++) {
         Entity *e = &level->enemies[i];
 
-        printf("Identity enemy_id_%d = {.permissionLevel = %d, .color = PURPLE, .speed = 250.0f};\n", i, e->type);
+        const char* col = "0";
+        switch (e->type) {
+            case ENEMY_CIVILIAN: col = "BLUE";   break;
+            case ENEMY_STAFF:    col = "GREEN";  break;
+            case ENEMY_GUARD:    col = "RED";    break;
+            case ENEMY_ADMIN:    col = "PURPLE"; break;
+            default: col = "WHITE"; break;
+		}
+		printf("Identity enemy_id_%d = {.permissionLevel = %d, .color = %s, .speed = 250.0f};\n", i, e->type, col);
         printf("level->enemies[%d] = InitEnemy((Vector2){%f,%f}, %s);\n",
             i, e->position.x, e->position.y, EnemyType_cstr(e->type)
         );
