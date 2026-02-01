@@ -1,154 +1,151 @@
 #include "../enemies/enemy.h"
 #include "../types.h"
 #include "episodes.h"
-
-static Texture2D texZone1;
-static Texture2D texZone2;
-static Texture2D texZone3;
-static Texture2D texZone4;
-
-#define ENEMY_SHOOT_INTERVAL 1.5f
+#include <stdio.h>
 
 void InitEpisode2(Level *level) {
     level->id = 2;
-    level->playerSpawn = (Vector2){100.0f, 320.0f};
-    level->playerStartId = GetIdentity(ENEMY_CIVILIAN);
-    level->winX = 3800.0f; // Adjusted for 4 zones
+    level->playerSpawn = (Vector2){200.0f, 600.0f}; // Start in BG 1
+    level->playerStartId = GetIdentity(ENEMY_GUARD);
+    level->winX = 8000.0f; // Long level
+    
+    // --- TEXTURES (New Assets) ---
+    level->bgs_count = 5;
+    static Texture2D bg1, bg2, bg3, bg4, bg5;
+    
+    if (bg1.id == 0) bg1 = LoadTexture("assets/environment/new_backg_1.png");
+    if (bg2.id == 0) bg2 = LoadTexture("assets/environment/new_backg_2.png");
+    if (bg3.id == 0) bg3 = LoadTexture("assets/environment/new_backg_3.png");
+    if (bg4.id == 0) bg4 = LoadTexture("assets/environment/new_backg_4.png");
+    if (bg5.id == 0) bg5 = LoadTexture("assets/environment/new_backg_5.png");
+    
+    // Layout: Cluster ("Complicated")
+    // BG2 (Hall) is Central. width approx 1000-1500?
+    // Let's assume average 1000 for calculation, user can adjust in Editor if overlaps occur.
+    
+    // 2. Central Hall
+    level->bgs[1] = (Background){bg2, (Rectangle){0,0,bg2.width,bg2.height}, (Rectangle){0, 0, bg2.width, bg2.height}};
+    
+    // 1. Kitchen (Left of Hall)
+    level->bgs[0] = (Background){bg1, (Rectangle){0,0,bg1.width,bg1.height}, (Rectangle){-bg1.width, 0, bg1.width, bg1.height}};
+    
+    // 3. Blue Room (Right of Hall)
+    level->bgs[2] = (Background){bg3, (Rectangle){0,0,bg3.width,bg3.height}, (Rectangle){bg2.width, 0, bg3.width, bg3.height}};
+    
+    // 4. Bathroom (Above Blue Room)
+    level->bgs[3] = (Background){bg4, (Rectangle){0,0,bg4.width,bg4.height}, (Rectangle){bg2.width, -bg4.height, bg4.width, bg4.height}};
+    
+    // 5. Living Room (Right of Blue Room)
+    level->bgs[4] = (Background){bg5, (Rectangle){0,0,bg5.width,bg5.height}, (Rectangle){bg2.width + bg3.width, 0, bg5.width, bg5.height}};
+    
+    level->winX = 8000.0f; // Far right
 
+    // --- WALLS ---
+    // Cleared for Editor use
     level->wallCount = 0;
+    
+    // --- DOORS ---
     level->doorCount = 0;
-    level->enemyCount = 0;
-    level->bgs_count = 0;
-
-    // Load Textures (Reusing mostly valid ones)
-    if (texZone1.id == 0)texZone1 = LoadTexture("assets/environment/background_1.png"); // Reception
-    if (texZone2.id == 0)texZone2 = LoadTexture("assets/environment/background_2.png"); // Office
-    if (texZone3.id == 0)texZone3 = LoadTexture("assets/environment/background_6.png"); // Security/Server
-    if (texZone4.id == 0)texZone4 = LoadTexture("assets/environment/background_3.png"); // Executive
-
-    // --- BACKGROUNDS ---
-    // Zone 1: Reception (Start)
-    // Size: 913x642
-    level->bgs[level->bgs_count++] = (Background){texZone1, (Rectangle){0,0,texZone1.width,texZone1.height}, (Rectangle){0,0,913,642}};
     
-    // Zone 2: Office (Right of Z1)
-    // Size: 911x661 -> Placed at X=913
-    level->bgs[level->bgs_count++] = (Background){texZone2, (Rectangle){0,0,texZone2.width,texZone2.height}, (Rectangle){913,0,911,661}};
-
-    // Zone 3: Security (Right of Z2)
-    // Size: 795x853 -> Placed at X=1824
-    level->bgs[level->bgs_count++] = (Background){texZone3, (Rectangle){0,0,texZone3.width,texZone3.height}, (Rectangle){1824,0,795,853}};
-
-    // Zone 4: Executive (Right of Z3)
-    // Size: 957x654 -> Placed at X=2619
-    level->bgs[level->bgs_count++] = (Background){texZone4, (Rectangle){0,0,texZone4.width,texZone4.height}, (Rectangle){2619,0,957,654}};
-
-
-    // --- WALLS & DOORS ---
+    // --- WALLS ---
+    level->wallCount = 0;
     
-    // -- Zone 1 (0..913, 0..642) --
-    // Top/Bottom
-    level->walls[level->wallCount++] = (Wall){(Rectangle){0, -50, 913, 50}, 0.0f}; // Top
-    level->walls[level->wallCount++] = (Wall){(Rectangle){0, 642, 913, 50}, 0.0f}; // Bottom
-    level->walls[level->wallCount++] = (Wall){(Rectangle){-50, 0, 50, 642}, 0.0f}; // Start
+    // 2. Central Hall Walls (Rectangle{0, 0, bg2.width, bg2.height})
+    level->walls[level->wallCount++] = (Wall){(Rectangle){0, 0, bg2.width, 50}, 0.0f}; // Top
+    level->walls[level->wallCount++] = (Wall){(Rectangle){0, bg2.height-50, bg2.width, 50}, 0.0f}; // Bottom (Partial? Leave gap for rooms if needed, but for now full)
     
-    // Pillars/Decor in Z1
-    level->walls[level->wallCount++] = (Wall){(Rectangle){300, 200, 40, 40}, 0.0f};
-    level->walls[level->wallCount++] = (Wall){(Rectangle){300, 400, 40, 40}, 0.0f};
-    level->walls[level->wallCount++] = (Wall){(Rectangle){600, 200, 40, 40}, 0.0f};
-    level->walls[level->wallCount++] = (Wall){(Rectangle){600, 400, 40, 40}, 0.0f};
-
-    // Door to Z2 (at 913)
-    level->walls[level->wallCount++] = (Wall){(Rectangle){913, 0, 20, 260}, 0.0f};
-    level->walls[level->wallCount++] = (Wall){(Rectangle){913, 380, 20, 300}, 0.0f};
-    level->doors[level->doorCount].rect = (Rectangle){913, 260, 20, 120};
-    level->doors[level->doorCount].requiredPerm = PERM_STAFF;
-    level->doors[level->doorCount].isOpen = false;
-    level->doors[level->doorCount].animationProgress = 0.0f;
-    level->doorCount++;
-
-
-    // -- Zone 2 (913..1824, 0..661) --
-    // Top/Bottom
-    level->walls[level->wallCount++] = (Wall){(Rectangle){913, -50, 911, 50}, 0.0f};
-    level->walls[level->wallCount++] = (Wall){(Rectangle){913, 661, 911, 50}, 0.0f}; 
+    // --- VERTICAL DIVIDERS (With Gaps/Doorways) ---
+    float doorSize = 250.0f; // Wide enough for player
     
-    // Office Cubicles
-    for(int i=0; i<3; i++) {
-        level->walls[level->wallCount++] = (Wall){(Rectangle){1200 + i*200, 150, 10, 200}, 0.0f};
-        level->walls[level->wallCount++] = (Wall){(Rectangle){1300 + i*200, 400, 10, 200}, 0.0f};
+    // 1. Kitchen <-> Hall [Divider at x=0]
+    // Top segment
+    level->walls[level->wallCount++] = (Wall){(Rectangle){-20, 0, 20, bg1.height/2 - doorSize/2}, 0.0f};
+    // Bottom segment
+    level->walls[level->wallCount++] = (Wall){(Rectangle){-20, bg1.height/2 + doorSize/2, 20, bg1.height/2 - doorSize/2}, 0.0f};
+    
+    // Gap Filler (Hall is taller than Kitchen)
+    if (bg2.height > bg1.height) {
+        level->walls[level->wallCount++] = (Wall){(Rectangle){-20, bg1.height, 20, bg2.height - bg1.height}, 0.0f};
     }
 
-    // Door to Z3 (at 1824)
-    level->walls[level->wallCount++] = (Wall){(Rectangle){1824, 0, 20, 260}, 0.0f};
-    level->walls[level->wallCount++] = (Wall){(Rectangle){1824, 380, 20, 500}, 0.0f}; 
-    // Z2 ends at Y=661. Z3 starts Y=0 ends Y=853.
-    // So the gap is below 661. But Z2 has a wall at 661. So it's fine.
+    // 2. Hall <-> Blue Room [Divider at x=bg2.width]
+    // Top segment
+    level->walls[level->wallCount++] = (Wall){(Rectangle){bg2.width, 0, 20, bg2.height/2 - doorSize/2}, 0.0f}; 
+    // Bottom segment
+    level->walls[level->wallCount++] = (Wall){(Rectangle){bg2.width, bg2.height/2 + doorSize/2, 20, bg2.height/2 - doorSize/2}, 0.0f};
+
+    // 3. Blue Room <-> Living Room [Divider at x=bg2.width + bg3.width]
+    float xLivingStart = bg2.width + bg3.width;
+    // Top segment
+    level->walls[level->wallCount++] = (Wall){(Rectangle){xLivingStart-20, 0, 20, bg3.height/2 - doorSize/2}, 0.0f};
+    // Bottom segment
+    level->walls[level->wallCount++] = (Wall){(Rectangle){xLivingStart-20, bg3.height/2 + doorSize/2, 20, bg3.height/2 - doorSize/2}, 0.0f};
     
-    level->doors[level->doorCount].rect = (Rectangle){1824, 260, 20, 120};
-    level->doors[level->doorCount].requiredPerm = PERM_GUARD;
-    level->doors[level->doorCount].isOpen = false;
-    level->doors[level->doorCount].animationProgress = 0.0f;
-    level->doorCount++;
+    // 4. Blue Room <-> Bathroom [Divider at top of Blue Room, y=0]
+    // Left segment
+    float xBathStart = bg2.width;
+    level->walls[level->wallCount++] = (Wall){(Rectangle){xBathStart, 0, bg3.width/2 - doorSize/2, 20}, 0.0f};
+    // Right segment
+    level->walls[level->wallCount++] = (Wall){(Rectangle){xBathStart + bg3.width/2 + doorSize/2, 0, bg3.width/2 - doorSize/2, 20}, 0.0f};
 
+    // ---- DOORS ----
+    level->doorCount = 4;
+    level->doors[0].rect = (Rectangle){-20.000000,216.000000,20.000000,250.000000};
+    level->doors[0].requiredPerm = PERM_STAFF;
+    level->doors[1].rect = (Rectangle){1371.000000,360.000000,20.000000,250.000000};
+    level->doors[1].requiredPerm = PERM_GUARD;
+    level->doors[2].rect = (Rectangle){2369.000000,214.000000,20.000000,250.000000};
+    level->doors[2].requiredPerm = PERM_ADMIN;
+    level->doors[3].rect = (Rectangle){1755.000000,0.000000,250.000000,20.000000};
+    level->doors[3].requiredPerm = PERM_STAFF;
 
-    // -- Zone 3 (1824..2619, 0..853) -- Security
-    // Top/Bottom
-    level->walls[level->wallCount++] = (Wall){(Rectangle){1824, -50, 795, 50}, 0.0f};
-    level->walls[level->wallCount++] = (Wall){(Rectangle){1824, 853, 795, 50}, 0.0f};
+    // 1. Kitchen Walls (Rectangle{-bg1.width, 0, bg1.width, bg1.height})
+    level->walls[level->wallCount++] = (Wall){(Rectangle){-bg1.width, 0, bg1.width, 50}, 0.0f}; // Top
+    level->walls[level->wallCount++] = (Wall){(Rectangle){-bg1.width, bg1.height-50, bg1.width, 50}, 0.0f}; // Bottom
+    level->walls[level->wallCount++] = (Wall){(Rectangle){-bg1.width, 0, 50, bg1.height}, 0.0f}; // Far Left Wall
+    
+    // 3. Blue Room Walls (Rectangle{bg2.width, 0, bg3.width, bg3.height})
+    float xBlue = bg2.width;
+    // REMOVED TOP WALL FOR BATHROOM ACCESS
+    level->walls[level->wallCount++] = (Wall){(Rectangle){xBlue, bg3.height-50, bg3.width, 50}, 0.0f}; // Bottom
+    
+    // 4. Bathroom Walls (Rectangle{bg2.width, -bg4.height, bg4.width, bg4.height})
+    float xBath = bg2.width;
+    float yBath = -bg4.height;
+    level->walls[level->wallCount++] = (Wall){(Rectangle){xBath, yBath, bg4.width, 50}, 0.0f}; // Top
+    level->walls[level->wallCount++] = (Wall){(Rectangle){xBath, yBath, 50, bg4.height}, 0.0f}; // Left
+    level->walls[level->wallCount++] = (Wall){(Rectangle){xBath + bg4.width - 50, yBath, 50, bg4.height}, 0.0f}; // Right
+    
+    // 5. Living Room Walls (Rectangle{bg2.width + bg3.width, 0, bg5.width, bg5.height})
+    float xLiving = bg2.width + bg3.width;
+    level->walls[level->wallCount++] = (Wall){(Rectangle){xLiving, 0, bg5.width, 50}, 0.0f}; // Top
+    level->walls[level->wallCount++] = (Wall){(Rectangle){xLiving, bg5.height-50, bg5.width, 50}, 0.0f}; // Bottom
+    level->walls[level->wallCount++] = (Wall){(Rectangle){xLiving + bg5.width - 50, 0, 50, bg5.height}, 0.0f}; // Far Right Wall
 
-    // Server Racks?
-    level->walls[level->wallCount++] = (Wall){(Rectangle){2000, 200, 20, 400}, 0.0f};
-    level->walls[level->wallCount++] = (Wall){(Rectangle){2200, 200, 20, 400}, 0.0f};
-    level->walls[level->wallCount++] = (Wall){(Rectangle){2400, 200, 20, 400}, 0.0f};
-
-    // Door to Z4 (at 2619)
-    level->walls[level->wallCount++] = (Wall){(Rectangle){2619, 0, 20, 260}, 0.0f};
-    level->walls[level->wallCount++] = (Wall){(Rectangle){2619, 380, 20, 500}, 0.0f};
-    level->doors[level->doorCount].rect = (Rectangle){2619, 260, 20, 120};
-    level->doors[level->doorCount].requiredPerm = PERM_ADMIN;
-    level->doors[level->doorCount].isOpen = false;
-    level->doors[level->doorCount].animationProgress = 0.0f;
-    level->doorCount++;
-
-
-    // -- Zone 4 (2619..3576, 0..654) -- Executive
-    // Top/Bottom
-    level->walls[level->wallCount++] = (Wall){(Rectangle){2619, -50, 957, 50}, 0.0f};
-    level->walls[level->wallCount++] = (Wall){(Rectangle){2619, 654, 957, 50}, 0.0f};
-    level->walls[level->wallCount++] = (Wall){(Rectangle){3576, 0, 50, 654}, 0.0f}; // End
-
-    // Boss Desk / Pillars
-    level->walls[level->wallCount++] = (Wall){(Rectangle){3000, 200, 50, 50}, 0.0f};
-    level->walls[level->wallCount++] = (Wall){(Rectangle){3000, 400, 50, 50}, 0.0f};
-    level->walls[level->wallCount++] = (Wall){(Rectangle){3300, 300, 100, 60}, 0.0f}; // Desk
-
-
-    // --- ENEMIES ---
-    // Zone 1
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){500, 200}, ENEMY_CIVILIAN);
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){500, 450}, ENEMY_CIVILIAN);
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){800, 320}, ENEMY_STAFF); // Key
-
-    // Zone 2
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){1200, 300}, ENEMY_STAFF);
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){1400, 500}, ENEMY_STAFF);
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){1600, 200}, ENEMY_GUARD); // Key
-
-    // Zone 3
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){2000, 100}, ENEMY_GUARD);
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){2300, 700}, ENEMY_GUARD);
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){2500, 320}, ENEMY_ADMIN); // Key
-
-    // Zone 4
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){2800, 200}, ENEMY_ADMIN);
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){2800, 500}, ENEMY_ADMIN);
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){3400, 320}, ENEMY_ADMIN); // Boss
+    // --- ENEMIES (Key Droppers) ---
+    level->enemyCount = 5;
+    
+    // 1. Kitchen Staff (Has Staff Card for Kitchen Door? No, Player is inside Kitchen maybe? Or Hall?)
+    // Let's place a Staff in the Hall to open Kitchen? Or Kitchen Staff to open Bathroom?
+    // Player spawns in Hall (bg2).
+    level->playerSpawn = (Vector2){200.0f, 600.0f}; // Actually bg2 starts at x=0. 200 is inside Hall.
+    
+    // Enemy 1: Hall Staff (Drops STAFF card -> Opens Kitchen/Bathroom)
+    level->enemies[0] = InitEnemy((Vector2){500.0f, 600.0f}, ENEMY_STAFF);
+    
+    // Enemy 2: Kitchen Guard (Drops GUARD card -> Opens Blue Room)
+    level->enemies[1] = InitEnemy((Vector2){-500.0f, 400.0f}, ENEMY_GUARD);
+    
+    // Enemy 3: Blue Room Guard (Drops nothing/Guard)
+    level->enemies[2] = InitEnemy((Vector2){bg2.width + 300.0f, 400.0f}, ENEMY_GUARD);
+    
+    // Enemy 4: Bathroom Admin (Drops ADMIN card -> Opens Living Room)
+    level->enemies[3] = InitEnemy((Vector2){bg2.width + 200.0f, -300.0f}, ENEMY_ADMIN);
+    
+    // Enemy 5: Living Room Boss
+    level->enemies[4] = InitEnemy((Vector2){xLivingStart + 400.0f, 400.0f}, ENEMY_ADMIN);
 }
 
 void UnloadEpisode2() {
-    UnloadTexture(texZone1);
-    UnloadTexture(texZone2);
-    UnloadTexture(texZone3);
-    UnloadTexture(texZone4);
+    // Unload if unique textures were loaded
 }
