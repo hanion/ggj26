@@ -385,9 +385,19 @@ static void SpawnBlood(Vector2 pos, int count) {
 
 static void UpdateGame(float dt) {
 	camera.offset = (Vector2){ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f };
-	float scale_x = GetScreenWidth()  / 1920.0f;
-	float scale_y = GetScreenHeight() / 1080.0f;
-	camera.zoom = 1.5f*fminf(scale_x, scale_y);
+
+    static float screen_width = 0;
+    static float screen_height = 0;
+    float width  = GetScreenWidth();
+    float height = GetScreenHeight();
+    if (width != screen_width || height != screen_height) {
+        screen_width  =  width;
+        screen_height = height;
+        float scale_x =  width / 1920.0f;
+        float scale_y = height / 1080.0f;
+        camera.zoom = 1.5f*fminf(scale_x, scale_y);
+    }
+
 
 
     // Debug Toggle F1
@@ -581,8 +591,10 @@ static void UpdateGame(float dt) {
     // --- LOGIC RESTORED ---
 
     // 1. Update Enemies
-    for (int i = 0; i < currentLevel.enemyCount; i++) {
-        UpdateEnemy(&currentLevel.enemies[i], player.position, &currentLevel, bullets, MAX_BULLETS, dt);
+    if (editor.state == ED_CLOSED) {
+        for (int i = 0; i < currentLevel.enemyCount; i++) {
+            UpdateEnemy(&currentLevel.enemies[i], player.position, &currentLevel, bullets, MAX_BULLETS, dt);
+        }
     }
 
     // 2. Player Shooting

@@ -10,6 +10,7 @@ typedef enum {
   PERM_GUARD = 2,
   PERM_ADMIN = 3
 } PermissionLevel;
+const char* PermissionLevel_cstr(PermissionLevel pl);
 
 // Ability Flags (Bitmask) - Keeping for legacy check or new mask system
 typedef enum {
@@ -26,12 +27,14 @@ typedef enum {
   ENEMY_GUARD,
   ENEMY_ADMIN
 } EnemyType;
+const char* EnemyType_cstr(EnemyType type);
 
 // AI Behavior Types
 typedef enum {
   AI_WALKER,
   AI_GUARDIAN
 } AIType;
+const char* AIType_cstr(AIType type);
 
 // AI States
 typedef enum {
