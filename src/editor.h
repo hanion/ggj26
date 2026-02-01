@@ -1,6 +1,5 @@
 #include "../raylib/src/raylib.h"
 #include "levels.h"
-#include <stdio.h>
 
 typedef enum {
     ED_CLOSED = 0,
@@ -16,6 +15,7 @@ typedef enum {
 
     ED_MOVE_DOOR,
     ED_SCALE_DOOR,
+    ED_ROTATE_DOOR,
 
     ED_MOVE_ENEMY,
 } EditorState;
