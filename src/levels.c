@@ -12,6 +12,9 @@ void InitLevel(int episode, Level *level) {
   level->enemyCount = 0;
 
   switch (episode) {
+  case 0:
+    InitProlog(level);
+    break;
   case 1:
     InitEpisode1(level);
     break;
@@ -26,6 +29,7 @@ void InitLevel(int episode, Level *level) {
 
 void UnloadLevel(int episode) {
   switch (episode) {
+  case 0: UnloadProlog(); break;
   case 1: UnloadEpisode1(); break;
   case 2: UnloadEpisode2(); break;
   }
