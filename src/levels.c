@@ -6,10 +6,16 @@ void InitEpisode1(Level *level); // Prototype from episodes/episode1.c (usually 
 #include "episodes/episodes.h"
 
 void InitLevel(int episode, Level *level) {
+  // Unload previous episode's assets first
+  static int lastEpisode = -1;
+  if (lastEpisode >= 0 && lastEpisode != episode) {
+    UnloadLevel(lastEpisode);
+  }
+  lastEpisode = episode;
+
+  // Reset entire level struct
+  *level = (Level){0};
   level->id = episode;
-  level->wallCount = 0;
-  level->doorCount = 0;
-  level->enemyCount = 0;
 
   switch (episode) {
   case 0:
