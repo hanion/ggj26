@@ -1,24 +1,6 @@
-#include "../raylib/src/raylib.h"
-#include "levels.h"
+#include "editor.h"
 #include <stdio.h>
 
-typedef enum {
-    ED_CLOSED = 0,
-
-    ED_IDLE,
-
-    ED_MOVE_WALL,
-    ED_SCALE_WALL,
-    ED_ROTATE_WALL,
-
-    ED_MOVE_BG,
-    ED_SCALE_BG,
-
-    ED_MOVE_DOOR,
-    ED_SCALE_DOOR,
-
-    ED_MOVE_ENEMY,
-} EditorState;
 
 bool is_state_closed(EditorState state) { return state == ED_CLOSED; }
 bool is_state_idle(EditorState state)   { return state == ED_IDLE; }
@@ -72,20 +54,6 @@ const char* EditorState_cstr(EditorState state) {
 	}
     return "INVALID ED STATE";
 }
-
-
-typedef struct {
-    Level* level;
-
-    EditorState state;
-    int selected;
-
-    Vector2 mouse_world;
-    Vector2 drag_offset;
-
-    float move_step;
-    float scale_step;
-} LevelEditor;
 
 
 LevelEditor LevelEditor_new(Level* level) {
@@ -323,7 +291,7 @@ void level_editor_export(LevelEditor* ed) {
 
 
 
-void level_editor_draw(LevelEditor* ed, Camera2D* camera) {
+void LevelEditor_update(LevelEditor* ed, Camera2D* camera) {
     if (!ed || !ed->level) return;
 
     if (IsKeyPressed(KEY_O)) {
