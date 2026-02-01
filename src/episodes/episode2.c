@@ -145,7 +145,8 @@ void InitEpisode2(Level *level) {
     level->enemies[level->enemyCount++] = InitEnemy((Vector2){3400, 320}, ENEMY_ADMIN); // Boss
 
     // ---- WIN AREA ----
-    level->win_area = (Rectangle){341.961548,2164.302490,438.000000,274.000000};
+    level->win_area = (Rectangle){3373.961426,168.302490,438.000000,274.000000};
+
 }
 
 void UnloadEpisode2() {
