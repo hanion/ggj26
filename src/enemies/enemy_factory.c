@@ -5,6 +5,7 @@
 
 Entity InitEnemy(Vector2 position, EnemyType type) {
     Entity enemy = {0};
+    enemy.type = type;
     enemy.position = position;
     enemy.active = true;
     enemy.isPlayer = false;

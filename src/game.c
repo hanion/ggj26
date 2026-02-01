@@ -591,8 +591,10 @@ static void UpdateGame(float dt) {
     // --- LOGIC RESTORED ---
 
     // 1. Update Enemies
-    for (int i = 0; i < currentLevel.enemyCount; i++) {
-        UpdateEnemy(&currentLevel.enemies[i], player.position, &currentLevel, bullets, MAX_BULLETS, dt);
+    if (editor.state == ED_CLOSED) {
+        for (int i = 0; i < currentLevel.enemyCount; i++) {
+            UpdateEnemy(&currentLevel.enemies[i], player.position, &currentLevel, bullets, MAX_BULLETS, dt);
+        }
     }
 
     // 2. Player Shooting

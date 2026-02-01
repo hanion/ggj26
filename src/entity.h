@@ -44,6 +44,7 @@ typedef struct {
 
   // AI State
   AIType aiType;
+  EnemyType type;
   EnemyState state;
   float sightRange;
   float sightAngle;       // Degrees, full cone (e.g. 120)
