@@ -21,6 +21,8 @@
 #include "player/player_render.h"
 #include "ui/hud.h"
 #include "types.h"
+#include "npc/npc.h"
+#include "episodes/episodes.h"
 
 #include "editor.c"
 
@@ -588,7 +590,9 @@ static void UpdateGame(float dt) {
         player.reloadTimer = currentGun->reloadTime;
         PlaySound(fxReload);
     }
-    // --- LOGIC RESTORED ---
+
+    // Update common systems
+    Npc_UpdateAll(&currentLevel, dt, &player); // optional if episode handles it; kept to ensure animations advance
 
     // 1. Update Enemies
     if (editor.state == ED_CLOSED) {
@@ -1149,6 +1153,10 @@ static void DrawGame(void) {
             }
         }
 
+
+        // --- Draw NPCs ---
+        Npc_DrawAll(&currentLevel, &player);
+
         // Mask
         for (int i = 0; i < MAX_MASKS; i++) {
             if (droppedMasks[i].active) {
@@ -1313,4 +1321,3 @@ void Game_Draw(void) {
 
 void Game_Shutdown(void) {
 }
-

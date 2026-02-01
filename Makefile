@@ -40,7 +40,8 @@ SRC = src/main.c \
     src/gameplay_helpers.c \
     src/masks/mask1.c \
     src/masks/mask2.c \
-    src/masks/mask_manager.c
+    src/masks/mask_manager.c \
+    src/npc/npc.c
 
 ggj26: $(SRC)
 	$(CC) -o ggj26 $(SRC) $(CFLAGS) $(LDFLAGS) $(LIBS)
