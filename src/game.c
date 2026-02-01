@@ -820,10 +820,20 @@ static void UpdateGame(float dt) {
                     }
 
                     if (emptyIdx != -1) {
-                         // Map dropped identity to mask type
-                         MaskAbilityType mType = MASK_SPEED; 
-                         // Logic to determine type (random or based on enemy?)
-                         if (droppedMasks[i].identity.color.r > 200) mType = MASK_STEALTH; // Red = Stealth?
+                         // Map dropped identity to mask type based on color
+                         MaskAbilityType mType = MASK_SPEED; // Default
+                         Color maskColor = droppedMasks[i].identity.color;
+                         
+                         // RED or BLUE = STEALTH, GREEN or PURPLE = SPEED
+                         if (maskColor.r > 200 && maskColor.g < 100) {
+                             mType = MASK_STEALTH; // RED
+                         } else if (maskColor.b > 200 && maskColor.r < 100) {
+                             mType = MASK_STEALTH; // BLUE
+                         } else if (maskColor.g > 200) {
+                             mType = MASK_SPEED;   // GREEN
+                         } else if (maskColor.r > 150 && maskColor.b > 200) {
+                             mType = MASK_SPEED;   // PURPLE
+                         }
                          
                          player.inventory.maskSlots[emptyIdx].type = mType;
                          player.inventory.maskSlots[emptyIdx].maxDuration = (mType == MASK_SPEED) ? 10.0f : 5.0f; 
