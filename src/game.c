@@ -112,6 +112,7 @@ static float playerDebugCrossSize = 10.0f;
 static Rectangle btnEpisode1;
 static Rectangle btnEpisode2;
 static Rectangle btnEpisode3;
+static Rectangle btnEpisode4;
 static Rectangle btnQuit;
 static Rectangle btnPlay;
 static Rectangle btnContinue;
@@ -260,7 +261,8 @@ void Game_Init(void) {
     btnEpisode1 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 70, (float)btnWidth, (float)btnHeight };
     btnEpisode2 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 140, (float)btnWidth, (float)btnHeight };
     btnEpisode3 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 210, (float)btnWidth, (float)btnHeight };
-    btnQuit     = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 280, (float)btnWidth, (float)btnHeight };
+    btnEpisode4 = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 280, (float)btnWidth, (float)btnHeight };
+    btnQuit     = (Rectangle){ (float)sw/2.0f - (float)btnWidth/2.0f, (float)startY + 350, (float)btnWidth, (float)btnHeight };
 #endif
 }
 
@@ -301,6 +303,8 @@ static bool UpdateMenu(void) {
             StartLevel(2);
         } else if (CheckCollisionPointRec(mousePos, btnEpisode3)) {
             StartLevel(3);
+        } else if (CheckCollisionPointRec(mousePos, btnEpisode4)) {
+            StartLevel(4);
         } else if (CheckCollisionPointRec(mousePos, btnQuit)) {
             return false;
         }
@@ -345,6 +349,9 @@ static void DrawMenu(void) {
 
     DrawRectangleRec(btnEpisode3, CheckCollisionPointRec(mousePos, btnEpisode3) ? hoverColor : normalColor);
     DrawText("EPISODE 3", btnEpisode3.x + 45, btnEpisode3.y + 15, 20, WHITE);
+
+    DrawRectangleRec(btnEpisode4, CheckCollisionPointRec(mousePos, btnEpisode4) ? hoverColor : normalColor);
+    DrawText("EPISODE 4", btnEpisode4.x + 45, btnEpisode4.y + 15, 20, WHITE);
 
     DrawRectangleRec(btnQuit, CheckCollisionPointRec(mousePos, btnQuit) ? hoverColor : normalColor);
     DrawText("QUIT", btnQuit.x + 75, btnQuit.y + 15, 20, WHITE);
