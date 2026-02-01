@@ -44,6 +44,11 @@ typedef struct {
 
 typedef struct {
     Rectangle rect;
+    float rotation; // Degrees
+} Wall;
+
+typedef struct {
+    Rectangle rect;
     PermissionLevel requiredPerm;
     bool isOpen;
     float animationProgress; // 0.0 = Closed, 1.0 = Fully Open
@@ -53,7 +58,7 @@ typedef struct {
   int id; // Phase/Episode ID
 
   // Level Layout
-  Rectangle walls[MAX_WALLS];
+  Wall walls[MAX_WALLS];
   int wallCount;
 
   // Interactive Objects

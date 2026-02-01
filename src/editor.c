@@ -1,5 +1,7 @@
 #include "editor.h"
 #include <stdio.h>
+#include "../raylib/src/rlgl.h"
+#include "gameplay_helpers.h"
 
 
 bool is_state_closed(EditorState state) { return state == ED_CLOSED; }
@@ -98,13 +100,13 @@ void editor_pick(LevelEditor* ed) {
     }
 
     for (int i = 0; i < ed->level->wallCount; i++) {
-        Rectangle *r = &ed->level->walls[i];
-        if (CheckCollisionPointRec(ed->mouse_world, *r)) {
+        Wall w = ed->level->walls[i];
+        if (CheckCollisionCircleRotatedRect(ed->mouse_world, 2.0f, w.rect, w.rotation)) {
             ed->state = ED_MOVE_WALL;
             ed->selected = i;
             ed->drag_offset = (Vector2){
-                ed->mouse_world.x - r->x,
-                ed->mouse_world.y - r->y
+                ed->mouse_world.x - w.rect.x,
+                ed->mouse_world.y - w.rect.y
             };
             return;
         }
@@ -164,7 +166,7 @@ void editor_update(LevelEditor* ed, Camera2D* camera) {
     switch (ed->state) {
         case ED_MOVE_WALL:
         case ED_ROTATE_WALL:
-        case ED_SCALE_WALL:   target_rect = &ed->level->walls[ed->selected]; break;
+        case ED_SCALE_WALL:   target_rect = &ed->level->walls[ed->selected].rect; break;
         case ED_MOVE_BG:
         case ED_SCALE_BG:     target_rect = &ed->level->bgs[ed->selected].dest; break;
         case ED_MOVE_DOOR:
@@ -187,6 +189,7 @@ void editor_update(LevelEditor* ed, Camera2D* camera) {
         }
     }
 
+
     if (is_state_scale(ed->state)) {
         float step = ed->scale_step;
         if (IsKeyDown(KEY_LEFT_SHIFT)) step *= 4.0f;
@@ -197,6 +200,21 @@ void editor_update(LevelEditor* ed, Camera2D* camera) {
         if (IsKeyDown(KEY_DOWN))  target_rect->height += step;
         if (IsKeyDown(KEY_UP))    target_rect->height -= step;
     }
+
+    // ROTATION (Applied to Walls)
+    if (ed->state == ED_MOVE_WALL || ed->state == ED_SCALE_WALL) {
+            float rotStep = 1.0f;
+            if (IsKeyDown(KEY_LEFT_SHIFT)) rotStep = 5.0f;
+            
+            if (IsKeyDown(KEY_Q)) ed->level->walls[ed->selected].rotation -= rotStep;
+            if (IsKeyDown(KEY_E)) ed->level->walls[ed->selected].rotation += rotStep;
+    }
+
+    if (ed->state == ED_MOVE_ENEMY) {
+        ed->level->enemies[ed->selected].position.x = target_rect->x;
+        ed->level->enemies[ed->selected].position.y = target_rect->y;
+    }
+    
 }
 
 const char* PermissionLevel_cstr(PermissionLevel pl) {
@@ -237,10 +255,11 @@ void level_editor_export(LevelEditor* ed) {
     printf("// ---- WALLS ----\n");
     printf("level->wallCount = %d;\n", level->wallCount);
     for (int i = 0; i < level->wallCount; i++) {
-        Rectangle r = level->walls[i];
+        Rectangle r = level->walls[i].rect;
+        float rot = level->walls[i].rotation;
         printf(
-            "level->walls[%d] = (Rectangle){%.0f, %.0f, %.0f, %.0f};\n",
-            i, r.x, r.y, r.width, r.height
+            "level->walls[%d] = (Wall){(Rectangle){%.0f, %.0f, %.0f, %.0f}, %.2ff};\n",
+            i, r.x, r.y, r.width, r.height, rot
         );
     }
 
@@ -316,10 +335,28 @@ void LevelEditor_update(LevelEditor* ed, Camera2D* camera) {
     BeginMode2D(*camera);
     // draw wall
     for (int i = 0; i < ed->level->wallCount; i++) {
-        DrawRectangleRec(ed->level->walls[i], DARKGRAY);
+        Wall w = ed->level->walls[i];
+        
+        // Draw Centered
+        // Center of the wall in world space
+        Vector2 center = { w.rect.x + w.rect.width/2.0f, w.rect.y + w.rect.height/2.0f };
+        
+        // Draw using center as target and w/2,h/2 as origin -> Rotates around center
+        DrawRectanglePro(
+            (Rectangle){center.x, center.y, w.rect.width, w.rect.height}, 
+            (Vector2){w.rect.width/2.0f, w.rect.height/2.0f}, 
+            w.rotation, 
+            DARKGRAY
+        );
 
         if (is_state_wall(ed->state) && i == ed->selected) {
-            DrawRectangleLinesEx(ed->level->walls[i], 2, RED);
+             // Draw Outline
+             rlPushMatrix();
+             rlTranslatef(center.x, center.y, 0);
+             rlRotatef(w.rotation, 0,0,1);
+             rlTranslatef(-w.rect.width/2.0f, -w.rect.height/2.0f, 0); // Move back to TL to draw AABB lines 
+             DrawRectangleLines(0, 0, w.rect.width, w.rect.height, RED);
+             rlPopMatrix();
         }
     }
     // draw bg
@@ -348,6 +385,7 @@ void LevelEditor_update(LevelEditor* ed, Camera2D* camera) {
         ),
         10, 800, 20, YELLOW
     );
+    DrawText("Controls: M/S (Mode), Arrows (Move/Scale), Q/E (Rotate Wall), Shift (Fast), I/O (Export/Toggle)", 10, 830, 20, GREEN);
 }
 
 

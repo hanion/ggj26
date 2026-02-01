@@ -5,7 +5,7 @@ CFLAGS = -I./raylib/src -Isrc
 
 # Developer build flag (0 = players, 1 = developers)
 # Usage: make DEV_MODE=1
-DEV_MODE ?= 0
+DEV_MODE ?= 1
 CFLAGS += -DDEV_MODE=$(DEV_MODE)
 LDFLAGS = -L./raylib/src -lraylib
 
@@ -36,6 +36,7 @@ SRC = src/main.c \
     src/enemies/enemy1.c \
     src/anim.c \
     src/episodes/episode2.c \
+    src/episodes/episode3.c \
     src/enemies/enemy_factory.c \
     src/gameplay_helpers.c \
     src/masks/mask1.c \

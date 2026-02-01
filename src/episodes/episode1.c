@@ -57,97 +57,59 @@ void InitEpisode1(Level *level) {
   level->wallCount = 0;
 
   // --- External Boundaries ---
-  // Top (Z1, Z2, Z3)
-  level->walls[level->wallCount++] = (Rectangle){-50, -50, 3000, 50};
+// Replace all rectangle assignments with Wall struct assignments
+// Example: level->walls[level->wallCount++] = (Wall){ (Rectangle){...}, 0.0f };
+// Since there are many, I will use a regex if possible or just replace the assignments.
+// Actually, I'll use a smarter regex in my head: `(Rectangle){` -> `(Wall){(Rectangle){` + `}, 0.0f}`
+// But multi_replace doesn't support regex in replacement efficiently across many lines without explicit chunks.
+// I'll try to replace groups.
+
+// Group 1: Boundaries
+  level->walls[level->wallCount++] = (Wall){(Rectangle){-50, -50, 3000, 50}, 0.0f};
   
   // Left Side
-  // Z1 Left
-  level->walls[level->wallCount++] = (Rectangle){-50, 0, 50, 642}; 
-  // Z6 Left (Starts at X=162) -> Need Wall at X=112? No, Z6 is at X=162. 
-  // Void to the left of Z6 (0..162).
-  // So left wall of Z6 is at 162-50 = 112.
-  level->walls[level->wallCount++] = (Rectangle){112, 654, 50, 853};
-  // Z7 Left
-  level->walls[level->wallCount++] = (Rectangle){112, 1507, 50, 805};
+  level->walls[level->wallCount++] = (Wall){(Rectangle){-50, 0, 50, 642}, 0.0f}; 
+  level->walls[level->wallCount++] = (Wall){(Rectangle){112, 654, 50, 853}, 0.0f};
+  level->walls[level->wallCount++] = (Wall){(Rectangle){112, 1507, 50, 805}, 0.0f};
 
   // Right Side
-  // Z3 Right (X=1824+957=2781)
-  level->walls[level->wallCount++] = (Rectangle){2781, 0, 50, 654};
-  // Z4 Right (X=1824+869=2693)
-  level->walls[level->wallCount++] = (Rectangle){2693, 654, 50, 645};
+  level->walls[level->wallCount++] = (Wall){(Rectangle){2781, 0, 50, 654}, 0.0f};
+  level->walls[level->wallCount++] = (Wall){(Rectangle){2693, 654, 50, 645}, 0.0f};
 
   // Bottoms
-  // Z4 Bottom (Y=654+645=1299) -> X=1824..2693
-  level->walls[level->wallCount++] = (Rectangle){1824, 1299, 900, 50};
-  // Z5 Bottom (Y=654+649=1303) -> X=957..1824
-  level->walls[level->wallCount++] = (Rectangle){957, 1303, 900, 50};
-  // Z7 Bottom (Y=1507+805=2312) -> X=162..957
-  level->walls[level->wallCount++] = (Rectangle){112, 2312, 900, 50};
+  level->walls[level->wallCount++] = (Wall){(Rectangle){1824, 1299, 900, 50}, 0.0f};
+  level->walls[level->wallCount++] = (Wall){(Rectangle){957, 1303, 900, 50}, 0.0f};
+  level->walls[level->wallCount++] = (Wall){(Rectangle){112, 2312, 900, 50}, 0.0f};
 
   // Right Side of Z7
-  // Z6 Right (X=162+795=957) is handled by dividers.
-  // Z7 Right (X=162+795=957) needs a wall.
-  level->walls[level->wallCount++] = (Rectangle){957, 1507, 20, 805}; // Covers Z7 right only
+  level->walls[level->wallCount++] = (Wall){(Rectangle){957, 1507, 20, 805}, 0.0f}; 
 
   // --- Internal Steps/Gaps ---
-  // Step Z1 bottom / Z6 top gap logic
-  // Z1 Bottom is 642. Z6 Top is 654. Gap 12px.
-  // Z1 Width 913. Z6 starts at 162.
-  // Wall at Y=642 from X=0 to 913 (Bottom of Z1)
-  // Connections:
-  // Z1 -> Z2 (Horizontal)
-  // Z2 -> Z3 (Horizontal)
-  // Z3 -> Z4 (Vertical or Corner?) Z3 is (1824,0). Z4 is (1824,654). Distinct rects.
-  // Z4 -> Z5 (Horizontal)
-  // Z5 -> Z6 (Horizontal)
-  // Z6 -> Z7 (Vertical)
+  level->walls[level->wallCount++] = (Wall){(Rectangle){0, 642, 913, 20}, 0.0f}; 
 
-  // Block Z1 bottom fully? Yes, Z1 only connects to Z2.
-  level->walls[level->wallCount++] = (Rectangle){0, 642, 913, 20}; // Z1 Bottom (Thinner)
+  level->walls[level->wallCount++] = (Wall){(Rectangle){913, 661, 911, 20}, 0.0f}; 
 
-  // Block Z2 bottom (Height 661). 
-  level->walls[level->wallCount++] = (Rectangle){913, 661, 911, 20}; // Z2 Bottom (Thinner)
+  level->walls[level->wallCount++] = (Wall){(Rectangle){1824, 654, 300, 20}, 0.0f}; 
+  level->walls[level->wallCount++] = (Wall){(Rectangle){2244, 654, 537, 20}, 0.0f}; 
 
-  // Block Z3 Bottom? (Height 654)
-  // Z3 connects to Z4. Z3 is x=1824..2781. Z4 is x=1824..2693. Y=654.
-  // They share the boundary Y=654.
-  // Wall at Y=654, check door.
-  level->walls[level->wallCount++] = (Rectangle){1824, 654, 300, 20}; // Left part (Thinner)
-  level->walls[level->wallCount++] = (Rectangle){2244, 654, 537, 20}; // Right part (Gap 120 at 2124)
-
-  // Block Z6 Top (Y=654) ?? 
-  // Z6 is (162, 654). Z1 is above it (0..913, 0..642).
-  // Wall at Y=642 covers Z1 bottom.
-  // Need wall at Y=654 for Z6 top? Yes, to be safe.
-  level->walls[level->wallCount++] = (Rectangle){162, 642, 795, 20}; // Thin filler (Thinner)
+  level->walls[level->wallCount++] = (Wall){(Rectangle){162, 642, 795, 20}, 0.0f}; 
 
   // --- Vertical Dividers (Doors) ---
-  // D1: Z1 -> Z2 (X=913)
-  level->walls[level->wallCount++] = (Rectangle){913, 0, 20, 260};
-  level->walls[level->wallCount++] = (Rectangle){913, 380, 20, 300}; // Gap
+  level->walls[level->wallCount++] = (Wall){(Rectangle){913, 0, 20, 260}, 0.0f};
+  level->walls[level->wallCount++] = (Wall){(Rectangle){913, 380, 20, 300}, 0.0f}; 
 
-  // D2: Z2 -> Z3 (X=1824)
-  level->walls[level->wallCount++] = (Rectangle){1824, 0, 20, 260};
-  level->walls[level->wallCount++] = (Rectangle){1824, 380, 20, 300};
+  level->walls[level->wallCount++] = (Wall){(Rectangle){1824, 0, 20, 260}, 0.0f};
+  level->walls[level->wallCount++] = (Wall){(Rectangle){1824, 380, 20, 300}, 0.0f};
 
-  // D4: Z4 -> Z5 (X=1824, Y=654..1300)
-  level->walls[level->wallCount++] = (Rectangle){1824, 654, 20, 260};
-  level->walls[level->wallCount++] = (Rectangle){1824, 1034, 20, 300};
+  level->walls[level->wallCount++] = (Wall){(Rectangle){1824, 654, 20, 260}, 0.0f};
+  level->walls[level->wallCount++] = (Wall){(Rectangle){1824, 1034, 20, 300}, 0.0f};
 
-  // D5: Z5 -> Z6 (X=957, Y=654..1300)
-  // Z5 Left is 957. Z6 Right is 957.
-  // Wall at 957.
-  level->walls[level->wallCount++] = (Rectangle){957, 654, 20, 260};
-  level->walls[level->wallCount++] = (Rectangle){957, 1034, 20, 300};
-  // Fix Gap Z6 Right (Below Z5, above Z7)
-  // Z5 ends at 1303. Z6 ends at 1507. D5 ends at 1334.
-  // Need wall from 1334 to 1507.
-  level->walls[level->wallCount++] = (Rectangle){957, 1334, 20, 173};
+  level->walls[level->wallCount++] = (Wall){(Rectangle){957, 654, 20, 260}, 0.0f};
+  level->walls[level->wallCount++] = (Wall){(Rectangle){957, 1034, 20, 300}, 0.0f};
+  level->walls[level->wallCount++] = (Wall){(Rectangle){957, 1334, 20, 173}, 0.0f};
 
-  // D6: Z6 -> Z7 (Y=1507).
-  // Z6 Bottom is 654+853 = 1507.
-  level->walls[level->wallCount++] = (Rectangle){162, 1507, 300, 20}; 
-  level->walls[level->wallCount++] = (Rectangle){582, 1507, 400, 20}; // Gap 120
+  level->walls[level->wallCount++] = (Wall){(Rectangle){162, 1507, 300, 20}, 0.0f}; 
+  level->walls[level->wallCount++] = (Wall){(Rectangle){582, 1507, 400, 20}, 0.0f}; 
 
   // --- Doors ---
   level->doorCount = 6;
