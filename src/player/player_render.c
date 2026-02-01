@@ -329,11 +329,16 @@ void PlayerRender_Draw(const PlayerRender *pr, const Entity *player, PlayerEquip
 // Muzzle flash offset constants (easy to tweak)
 #define MUZZLE_OFFSET_X 40.0f
 #define MUZZLE_OFFSET_Y 16.0f
+#define MUZZLE_FLASH_DURATION 0.1f  // Only show muzzle flash for this duration (seconds)
 
-void PlayerRender_DrawMuzzleFlash(const PlayerRender *pr, const Entity *player, PlayerEquipState currentEquip, float weaponShootTimer) {
+void PlayerRender_DrawMuzzleFlash(const PlayerRender *pr, const Entity *player, PlayerEquipState currentEquip, float weaponShootTimer, float weaponCooldown) {
     if (!pr || !pr->loaded || !player) return;
     if (pr->muzzleFlash.id == 0) return;
     if (weaponShootTimer <= 0.0f) return;
+    
+    // Only show muzzle flash for the first MUZZLE_FLASH_DURATION seconds after shooting
+    float timeSinceShot = weaponCooldown - weaponShootTimer;
+    if (timeSinceShot > MUZZLE_FLASH_DURATION) return;
     
     // Only show muzzle flash for guns
     if (currentEquip != PLAYER_EQUIP_HANDGUN &&
