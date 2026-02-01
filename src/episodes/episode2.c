@@ -2,108 +2,153 @@
 #include "../types.h"
 #include "episodes.h"
 
+static Texture2D texZone1;
+static Texture2D texZone2;
+static Texture2D texZone3;
+static Texture2D texZone4;
+
 #define ENEMY_SHOOT_INTERVAL 1.5f
 
 void InitEpisode2(Level *level) {
     level->id = 2;
-    level->playerSpawn = (Vector2){100.0f, 360.0f};
+    level->playerSpawn = (Vector2){100.0f, 320.0f};
     level->playerStartId = GetIdentity(ENEMY_CIVILIAN);
-    level->winX = 6100.0f; // Much longer level
+    level->winX = 3800.0f; // Adjusted for 4 zones
 
     level->wallCount = 0;
     level->doorCount = 0;
     level->enemyCount = 0;
+    level->bgs_count = 0;
 
-    // --- WALLS ---
-    // Boundaries
-    level->walls[level->wallCount++] = (Rectangle){-50, -50, 7100, 50}; // Top
-    level->walls[level->wallCount++] = (Rectangle){-50, 720, 7100, 50}; // Bottom
-    level->walls[level->wallCount++] = (Rectangle){-50, 0, 50, 720};    // Start
-    level->walls[level->wallCount++] = (Rectangle){7000, 0, 50, 720};   // End
+    // Load Textures (Reusing mostly valid ones)
+    if (texZone1.id == 0)texZone1 = LoadTexture("assets/environment/background_1.png"); // Reception
+    if (texZone2.id == 0)texZone2 = LoadTexture("assets/environment/background_2.png"); // Office
+    if (texZone3.id == 0)texZone3 = LoadTexture("assets/environment/background_6.png"); // Security/Server
+    if (texZone4.id == 0)texZone4 = LoadTexture("assets/environment/background_3.png"); // Executive
 
-    // Zone 1: Reception / Waiting Area (Civilian -> Staff)
-    // Lots of pillars/seats
-    for(int i=0; i<5; i++) {
-        level->walls[level->wallCount++] = (Rectangle){400 + i*200, 200, 50, 50};
-        level->walls[level->wallCount++] = (Rectangle){400 + i*200, 500, 50, 50};
-    }
-    // Gate to Zone 2
-    level->walls[level->wallCount++] = (Rectangle){1500, 0, 50, 300};
-    level->walls[level->wallCount++] = (Rectangle){1500, 420, 50, 300};
-    level->doors[level->doorCount].rect = (Rectangle){1500, 300, 50, 120};
+    // --- BACKGROUNDS ---
+    // Zone 1: Reception (Start)
+    // Size: 913x642
+    level->bgs[level->bgs_count++] = (Background){texZone1, (Rectangle){0,0,texZone1.width,texZone1.height}, (Rectangle){0,0,913,642}};
+    
+    // Zone 2: Office (Right of Z1)
+    // Size: 911x661 -> Placed at X=913
+    level->bgs[level->bgs_count++] = (Background){texZone2, (Rectangle){0,0,texZone2.width,texZone2.height}, (Rectangle){913,0,911,661}};
+
+    // Zone 3: Security (Right of Z2)
+    // Size: 795x853 -> Placed at X=1824
+    level->bgs[level->bgs_count++] = (Background){texZone3, (Rectangle){0,0,texZone3.width,texZone3.height}, (Rectangle){1824,0,795,853}};
+
+    // Zone 4: Executive (Right of Z3)
+    // Size: 957x654 -> Placed at X=2619
+    level->bgs[level->bgs_count++] = (Background){texZone4, (Rectangle){0,0,texZone4.width,texZone4.height}, (Rectangle){2619,0,957,654}};
+
+
+    // --- WALLS & DOORS ---
+    
+    // -- Zone 1 (0..913, 0..642) --
+    // Top/Bottom
+    level->walls[level->wallCount++] = (Rectangle){0, -50, 913, 50}; // Top
+    level->walls[level->wallCount++] = (Rectangle){0, 642, 913, 50}; // Bottom
+    level->walls[level->wallCount++] = (Rectangle){-50, 0, 50, 642}; // Start
+    
+    // Pillars/Decor in Z1
+    level->walls[level->wallCount++] = (Rectangle){300, 200, 40, 40};
+    level->walls[level->wallCount++] = (Rectangle){300, 400, 40, 40};
+    level->walls[level->wallCount++] = (Rectangle){600, 200, 40, 40};
+    level->walls[level->wallCount++] = (Rectangle){600, 400, 40, 40};
+
+    // Door to Z2 (at 913)
+    level->walls[level->wallCount++] = (Rectangle){913, 0, 20, 260};
+    level->walls[level->wallCount++] = (Rectangle){913, 380, 20, 300};
+    level->doors[level->doorCount].rect = (Rectangle){913, 260, 20, 120};
     level->doors[level->doorCount].requiredPerm = PERM_STAFF;
     level->doors[level->doorCount].isOpen = false;
+    level->doors[level->doorCount].animationProgress = 0.0f;
     level->doorCount++;
 
-    // Zone 2: Office Cubicles (Staff -> Guard)
-    // Maze-like cubicle walls
+
+    // -- Zone 2 (913..1824, 0..661) --
+    // Top/Bottom
+    level->walls[level->wallCount++] = (Rectangle){913, -50, 911, 50};
+    level->walls[level->wallCount++] = (Rectangle){913, 661, 911, 50}; 
+    
+    // Office Cubicles
     for(int i=0; i<3; i++) {
-        level->walls[level->wallCount++] = (Rectangle){1800 + i*400, 150, 20, 200};
-        level->walls[level->wallCount++] = (Rectangle){2000 + i*400, 400, 20, 200};
+        level->walls[level->wallCount++] = (Rectangle){1200 + i*200, 150, 10, 200};
+        level->walls[level->wallCount++] = (Rectangle){1300 + i*200, 400, 10, 200};
     }
-    // Gate to Zone 3
-    level->walls[level->wallCount++] = (Rectangle){3000, 0, 50, 300};
-    level->walls[level->wallCount++] = (Rectangle){3000, 420, 50, 300};
-    level->doors[level->doorCount].rect = (Rectangle){3000, 300, 50, 120};
+
+    // Door to Z3 (at 1824)
+    level->walls[level->wallCount++] = (Rectangle){1824, 0, 20, 260};
+    level->walls[level->wallCount++] = (Rectangle){1824, 380, 20, 500}; 
+    // Z2 ends at Y=661. Z3 starts Y=0 ends Y=853.
+    // So the gap is below 661. But Z2 has a wall at 661. So it's fine.
+    
+    level->doors[level->doorCount].rect = (Rectangle){1824, 260, 20, 120};
     level->doors[level->doorCount].requiredPerm = PERM_GUARD;
     level->doors[level->doorCount].isOpen = false;
+    level->doors[level->doorCount].animationProgress = 0.0f;
     level->doorCount++;
 
-    // Zone 3: High Security / Server Room (Guard -> Admin)
-    // Long corridors with cover
-    level->walls[level->wallCount++] = (Rectangle){3200, 200, 500, 20};
-    level->walls[level->wallCount++] = (Rectangle){3800, 500, 500, 20};
-    level->walls[level->wallCount++] = (Rectangle){4000, 200, 20, 200};
-    
-    // Gate to Zone 4
-    level->walls[level->wallCount++] = (Rectangle){4500, 0, 50, 300};
-    level->walls[level->wallCount++] = (Rectangle){4500, 420, 50, 300};
-    level->doors[level->doorCount].rect = (Rectangle){4500, 300, 50, 120};
+
+    // -- Zone 3 (1824..2619, 0..853) -- Security
+    // Top/Bottom
+    level->walls[level->wallCount++] = (Rectangle){1824, -50, 795, 50};
+    level->walls[level->wallCount++] = (Rectangle){1824, 853, 795, 50};
+
+    // Server Racks?
+    level->walls[level->wallCount++] = (Rectangle){2000, 200, 20, 400};
+    level->walls[level->wallCount++] = (Rectangle){2200, 200, 20, 400};
+    level->walls[level->wallCount++] = (Rectangle){2400, 200, 20, 400};
+
+    // Door to Z4 (at 2619)
+    level->walls[level->wallCount++] = (Rectangle){2619, 0, 20, 260};
+    level->walls[level->wallCount++] = (Rectangle){2619, 380, 20, 500};
+    level->doors[level->doorCount].rect = (Rectangle){2619, 260, 20, 120};
     level->doors[level->doorCount].requiredPerm = PERM_ADMIN;
     level->doors[level->doorCount].isOpen = false;
+    level->doors[level->doorCount].animationProgress = 0.0f;
     level->doorCount++;
 
-    // Zone 4: Executive / Admin Area (Admin)
-    // Open arena with pillars
-    level->walls[level->wallCount++] = (Rectangle){4800, 150, 50, 50};
-    level->walls[level->wallCount++] = (Rectangle){4800, 550, 50, 50};
-    level->walls[level->wallCount++] = (Rectangle){5500, 150, 50, 50};
-    level->walls[level->wallCount++] = (Rectangle){5500, 550, 50, 50};
-    level->walls[level->wallCount++] = (Rectangle){5150, 335, 50, 50}; // Center pillar
+
+    // -- Zone 4 (2619..3576, 0..654) -- Executive
+    // Top/Bottom
+    level->walls[level->wallCount++] = (Rectangle){2619, -50, 957, 50};
+    level->walls[level->wallCount++] = (Rectangle){2619, 654, 957, 50};
+    level->walls[level->wallCount++] = (Rectangle){3576, 0, 50, 654}; // End
+
+    // Boss Desk / Pillars
+    level->walls[level->wallCount++] = (Rectangle){3000, 200, 50, 50};
+    level->walls[level->wallCount++] = (Rectangle){3000, 400, 50, 50};
+    level->walls[level->wallCount++] = (Rectangle){3300, 300, 100, 60}; // Desk
+
 
     // --- ENEMIES ---
-    // Zone 1 (Staff needed) - Civilans/Staff mixed
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){600, 250}, ENEMY_CIVILIAN);
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){600, 450}, ENEMY_CIVILIAN);
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){1000, 360}, ENEMY_STAFF); // Key holder
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){1200, 150}, ENEMY_CIVILIAN);
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){1200, 550}, ENEMY_STAFF);
+    // Zone 1
+    level->enemies[level->enemyCount++] = InitEnemy((Vector2){500, 200}, ENEMY_CIVILIAN);
+    level->enemies[level->enemyCount++] = InitEnemy((Vector2){500, 450}, ENEMY_CIVILIAN);
+    level->enemies[level->enemyCount++] = InitEnemy((Vector2){800, 320}, ENEMY_STAFF); // Key
 
-    // Zone 2 (Guard needed) - Staff/Guards
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){1700, 100}, ENEMY_STAFF);
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){1900, 600}, ENEMY_STAFF);
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){2200, 300}, ENEMY_GUARD); // Key holder
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){2400, 100}, ENEMY_GUARD);
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){2600, 600}, ENEMY_STAFF);
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){2800, 360}, ENEMY_GUARD);
+    // Zone 2
+    level->enemies[level->enemyCount++] = InitEnemy((Vector2){1200, 300}, ENEMY_STAFF);
+    level->enemies[level->enemyCount++] = InitEnemy((Vector2){1400, 500}, ENEMY_STAFF);
+    level->enemies[level->enemyCount++] = InitEnemy((Vector2){1600, 200}, ENEMY_GUARD); // Key
 
-    // Zone 3 (Admin needed) - Guards/Admins
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){3200, 100}, ENEMY_GUARD);
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){3200, 600}, ENEMY_GUARD);
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){3600, 360}, ENEMY_ADMIN); // Key holder
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){3800, 100}, ENEMY_GUARD);
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){4000, 600}, ENEMY_GUARD);
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){4300, 360}, ENEMY_GUARD);
+    // Zone 3
+    level->enemies[level->enemyCount++] = InitEnemy((Vector2){2000, 100}, ENEMY_GUARD);
+    level->enemies[level->enemyCount++] = InitEnemy((Vector2){2300, 700}, ENEMY_GUARD);
+    level->enemies[level->enemyCount++] = InitEnemy((Vector2){2500, 320}, ENEMY_ADMIN); // Key
 
-    // Zone 4 (End) - Admins/Elite
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){4700, 360}, ENEMY_ADMIN);
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){5000, 200}, ENEMY_ADMIN);
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){5000, 500}, ENEMY_ADMIN);
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){5500, 100}, ENEMY_ADMIN);
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){5500, 600}, ENEMY_ADMIN);
-    level->enemies[level->enemyCount++] = InitEnemy((Vector2){6000, 360}, ENEMY_ADMIN); // Final boss
+    // Zone 4
+    level->enemies[level->enemyCount++] = InitEnemy((Vector2){2800, 200}, ENEMY_ADMIN);
+    level->enemies[level->enemyCount++] = InitEnemy((Vector2){2800, 500}, ENEMY_ADMIN);
+    level->enemies[level->enemyCount++] = InitEnemy((Vector2){3400, 320}, ENEMY_ADMIN); // Boss
 }
 
 void UnloadEpisode2() {
-
+    UnloadTexture(texZone1);
+    UnloadTexture(texZone2);
+    UnloadTexture(texZone3);
+    UnloadTexture(texZone4);
 }

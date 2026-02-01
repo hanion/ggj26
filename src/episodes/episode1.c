@@ -175,7 +175,10 @@ void InitEpisode1(Level *level) {
   level->doors[5].rect = (Rectangle){462, 1507, 120, 20};
   level->doors[5].requiredPerm = PERM_ADMIN;
   
-  for(int i=0; i<6; i++) level->doors[i].isOpen = false;
+  for(int i=0; i<6; i++) {
+      level->doors[i].isOpen = false;
+      level->doors[i].animationProgress = 0.0f;
+  }
 
   // --- Enemies (Unique Keys) ---
   level->enemyCount = 7;
