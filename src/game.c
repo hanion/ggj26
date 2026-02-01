@@ -49,7 +49,7 @@ static GameState currentState;
 static Level currentLevel;
 LevelEditor editor;
 static bool gameOver; 
-static bool gameWon; 
+bool gameWon; 
 
 static Entity player;
 static Camera2D camera;
