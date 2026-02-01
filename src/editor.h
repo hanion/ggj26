@@ -17,6 +17,9 @@ typedef enum {
     ED_SCALE_DOOR,
 
     ED_MOVE_ENEMY,
+
+    ED_MOVE_WA,
+    ED_SCALE_WA,
 } EditorState;
 
 typedef struct {
