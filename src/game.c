@@ -1008,6 +1008,7 @@ static void DrawGame(void) {
 
         for (int i = 0; i < currentLevel.bgs_count; i++) {
             Background* bg = &currentLevel.bgs[i];
+            DrawRectangleRec(bg->dest, WHITE); // Solid backing
             DrawTexturePro(bg->texture, bg->source, bg->dest, (Vector2){0,0}, 0.f, WHITE);
         }
 

@@ -154,7 +154,6 @@ void editor_update_state(LevelEditor* ed) {
 
     if (IsKeyPressed(KEY_R)) {
         if (is_state_wall(ed->state)) ed->state = ED_ROTATE_WALL;
-        if (is_state_door(ed->state)) ed->state = ED_ROTATE_DOOR;
     }
 }
 
@@ -403,18 +402,39 @@ void editor_create_new_door(LevelEditor* ed) {
 
 
 void editor_delete_entity(LevelEditor* ed) {
-    size_t to_delete_idx = ed->selected;
+    if (ed->selected < 0) return;
+    int idx = ed->selected;
 
     if (is_state_wall(ed->state)) {
-        memmove(ed->level->walls + to_delete_idx, ed->level->walls + to_delete_idx+1, ed->level->wallCount - to_delete_idx);
+        if (idx >= ed->level->wallCount) return;
+        size_t num_to_move = ed->level->wallCount - idx - 1;
+        if (num_to_move > 0) {
+            memmove(&ed->level->walls[idx], &ed->level->walls[idx+1], num_to_move * sizeof(Wall));
+        }
         ed->level->wallCount--;
+        ed->selected = -1;
+        ed->state = ED_IDLE;
     }
-
-    if (is_state_enemy(ed->state)) {
-        memmove(ed->level->enemies + to_delete_idx, ed->level->enemies + to_delete_idx+1, ed->level->enemyCount - to_delete_idx);
+    else if (is_state_enemy(ed->state)) {
+        if (idx >= ed->level->enemyCount) return;
+        size_t num_to_move = ed->level->enemyCount - idx - 1;
+        if (num_to_move > 0) {
+            memmove(&ed->level->enemies[idx], &ed->level->enemies[idx+1], num_to_move * sizeof(Entity));
+        }
         ed->level->enemyCount--;
+        ed->selected = -1;
+        ed->state = ED_IDLE;
     }
-
+    else if (is_state_door(ed->state)) {
+        if (idx >= ed->level->doorCount) return;
+        size_t num_to_move = ed->level->doorCount - idx - 1;
+        if (num_to_move > 0) {
+            memmove(&ed->level->doors[idx], &ed->level->doors[idx+1], num_to_move * sizeof(Door));
+        }
+        ed->level->doorCount--;
+        ed->selected = -1;
+        ed->state = ED_IDLE;
+    }
 }
 
 void LevelEditor_update(LevelEditor* ed, Camera2D* camera) {
