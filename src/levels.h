@@ -6,6 +6,21 @@
 #include "types.h"
 #include <stddef.h>
 
+#define NPC_MAX_FRAMES 6
+
+typedef struct NPC {
+    Vector2 position;
+    float radius;
+    float scale; // draw scale (1.0f = original size)
+    Color tint;
+    const char *name;
+    Texture2D frames[NPC_MAX_FRAMES];
+    int frameIndex;
+    int frameCount;
+    float frameTimer;
+    float frameDuration;
+} NPC;
+
 #define MAX_WALLS 200
 #define MAX_DOORS 20
 #define MAX_ENEMIES 50
@@ -37,6 +52,10 @@ typedef struct {
   // NPCs
   Entity enemies[MAX_ENEMIES];
   int enemyCount;
+
+  // NPCs (non-hostile, interactable)
+  int npcCount;
+  NPC npcs[8];
 
   // Spawn Point
   Vector2 playerSpawn;
