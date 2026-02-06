@@ -38,6 +38,7 @@ SRC = src/main.c \
     src/episodes/episode2.c \
     src/episodes/episode3.c \
     src/episodes/episode4.c \
+    src/episodes/episode5.c \
     src/enemies/enemy_factory.c \
     src/gameplay_helpers.c \
     src/masks/mask1.c \
