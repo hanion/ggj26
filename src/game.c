@@ -460,6 +460,12 @@ static void UpdateGame(float dt) {
                 gameCtx.nextEpisodeId = 1; // Prolog -> Episode 1
             } else if (currentLevel.id == 1) {
                 gameCtx.nextEpisodeId = 2; // Episode 1 -> Episode 2
+            } else if (currentLevel.id == 2) {
+                gameCtx.nextEpisodeId = 3; // Episode 2 -> Episode 3
+            } else if (currentLevel.id == 3) {
+                gameCtx.nextEpisodeId = 4; // Episode 3 -> Episode 4
+            } else if (currentLevel.id == 4) {
+                gameCtx.nextEpisodeId = 0; // Episode 4 -> Prolog (game complete, restart)
             }
 
             // Player builds: Next or Menu.
